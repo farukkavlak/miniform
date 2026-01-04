@@ -32,6 +32,19 @@ describe('Miniform Parser', () => {
       });
     });
 
+    it('should parse boolean false value', () => {
+      const input = `
+      resource "mock_resource" "test" {
+        enabled = false
+      }
+    `;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].attributes.enabled).toEqual({ type: 'Boolean', value: false });
+    });
+
     it('should parse multiple resources', () => {
       const input = `
       resource "valid" "one" { key = "value" }

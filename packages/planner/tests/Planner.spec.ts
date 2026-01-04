@@ -114,4 +114,29 @@ describe('Planner', () => {
     expect(actions[0].type).toBe('NO_OP');
     expect(actions[0].changes).toBeUndefined();
   });
+
+  it('should ignore non-Resource statements in Program', () => {
+    // Future-proofing: If we add Variable or Output blocks, they should be ignored
+    const desired: Program = [
+      {
+        type: 'Resource',
+        resourceType: 'mock_resource',
+        name: 'test_resource_e',
+        attributes: { value: { type: 'String', value: 'test' } },
+      },
+      // @ts-expect-error - Testing future statement types
+      { type: 'Variable', name: 'some_var', default: 'value' },
+    ];
+
+    const current: IState = {
+      version: 1,
+      resources: {},
+    };
+
+    const actions = plan(desired, current);
+    // Should only plan the Resource, ignore the Variable
+    expect(actions).toHaveLength(1);
+    expect(actions[0].type).toBe('CREATE');
+    expect(actions[0].resourceType).toBe('mock_resource');
+  });
 });
