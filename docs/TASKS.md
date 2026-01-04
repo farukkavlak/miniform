@@ -27,14 +27,24 @@
 
 **Requirement:** A modular system to manage state, resolve dependencies, and execute changes.
 
-- [x] **Implement Modular Core Engine** (`@miniform/contracts`, `@miniform/graph`, `@miniform/state`, `@miniform/planner`, `@miniform/orchestrator`)
-  - [x] Define `IResource`, `IProvider` interfaces
+- [x] **`@miniform/contracts`:** Define shared interfaces (`IResource`, `IProvider`)
+- [x] **`@miniform/graph`:** Implement DAG (Directed Acyclic Graph) & Topological Sort
+- [x] **`@miniform/state`:** Implement JSON reader/writer & Locking mechanism
+- [x] **`@miniform/planner`:** Diff Engine logic (Config vs State)
+- [x] **`@miniform/orchestrator`:** The Orchestrator that binds everything together
+  - [x] Provider Registry
+  - [x] Config Parsing Integration
+  - [x] Dependency Graph Building
+  - [x] Plan Execution (CREATE/UPDATE/DELETE/NO_OP)
+  - [x] Parallel Execution (Layer-based)
+  - [x] State Management (Atomic writes)
+  - [x] Comprehensive Tests (16 tests, 100% statement coverage)
+- [ ] **Integration Tests:** Verify simple apply/plan cycles
   - [x] Implement Schema Validation (Runtime type checking)
   - [x] Implement DAG & Topological Sort (No deps)
   - [x] Implement Parallel Execution (Batch-wise layers)
   - [x] Basic State Manager (JSON I/O)
   - [x] Implement Locking & Backup (Reliability)
-  - [x] Enhance Error Reporting (Line/Col in Parser)
   - [x] Implement Variables Support (`var.name` references)
   - [x] Implement Diff Engine (Plan logic)
   - [x] Implement Orchestrator (Runner)
@@ -63,9 +73,11 @@
 
 **Requirement:** Command-line interface for user interaction.
 
-- [ ] `miniform init`: Workspace setup
-- [ ] `miniform plan`: Dry-run (show diffs)
-- [ ] `miniform apply`: Execute changes
+- [ ] **`@miniform/cli`:** User-facing commands
+  - [ ] `miniform init`: Workspace setup (create .miniform/, initialize state)
+  - [ ] `miniform plan`: Dry-run (show diffs without applying)
+  - [ ] `miniform apply`: Execute changes (calls Orchestrator.apply())
+  - [ ] Pretty output formatting (colored diffs, progress indicators)
 
 ## 6. Future Scope: Scalable Provider Architecture
 
