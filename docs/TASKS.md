@@ -54,19 +54,21 @@
 
 **Requirement:** Implement specific resource types to prove the engine works.
 
-### 4.1. Core Resources
+### 4.1. Local Provider
 
-- [ ] **`local_file`**:
-  - Manage files on disk.
-  - Inputs: `filename`, `content`
-- [ ] **`random_string`**:
-  - Generate random strings (good for testing state persistence).
+- [x] **`@miniform/provider-local`:** Local file system provider
+  - [x] `local_file` resource (create/update/delete files)
+  - [x] Modular resource handler architecture
+  - [x] Validation logic
+  - [x] Comprehensive tests (11 tests, 100% statement coverage)
+
+### 4.2. Future Resources
+
+- [ ] **`random_string`:** Generate random strings (good for testing state persistence)
   - Inputs: `length`, `special` (bool)
-- [ ] **`null_resource`**:
-  - Do nothing (good for testing dependency chains).
+- [ ] **`null_resource`:** Do nothing (good for testing dependency chains)
   - Inputs: `triggers` (map)
-- [ ] **`command_exec`**:
-  - Execute shell commands.
+- [ ] **`command_exec`:** Execute shell commands
   - Inputs: `command`, `cwd`
 
 ## 5. CLI Implementation
