@@ -127,9 +127,10 @@ export class Orchestrator {
         break;
       }
 
-      default:
+      default: {
         // Should never happen if planner works correctly
         throw new Error(`Unknown action type: ${action.type}`);
+      }
     }
   }
 
