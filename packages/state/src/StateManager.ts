@@ -26,9 +26,38 @@ export class StateManager {
   }
 
   async write(state: IState): Promise<void> {
+    // Create backup if file exists
+    try {
+      await fs.access(this.filePath);
+      await fs.copyFile(this.filePath, `${this.filePath}.bak`);
+    } catch {
+      // File doesn't exist, no backup needed
+    }
+
     const content = JSON.stringify(state, null, 2);
     await fs.writeFile(this.filePath, content, 'utf8');
   }
 
-  // TODO: Implement lock mechanism using a separate .lock file
+  get lockFilePath(): string {
+    return `${this.filePath}.lock`;
+  }
+
+  async lock(): Promise<void> {
+    try {
+      // 'wx' flag fails if file exists
+      await fs.writeFile(this.lockFilePath, String(Date.now()), { flag: 'wx' });
+    } catch (error) {
+      if ((error as { code: string }).code === 'EEXIST') throw new Error('State is locked by another process.');
+      throw error;
+    }
+  }
+
+  async unlock(): Promise<void> {
+    try {
+      await fs.unlink(this.lockFilePath);
+    } catch (error) {
+      if ((error as { code: string }).code !== 'ENOENT') throw error;
+      // If lock file doesn't exist, it's already unlocked (idempotent)
+    }
+  }
 }

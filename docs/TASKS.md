@@ -76,8 +76,8 @@
 
 **Requirement:** List of identified gaps to be addressed in future iterations.
 
-- [ ] **State Locking:** Race condition protection (lock file).
-- [ ] **State Backup:** Atomic writes with backup (.bak) generation.
+- [x] **State Locking:** Race condition protection (lock file).
+- [x] **State Backup:** Atomic writes with backup (.bak) generation.
 - [ ] **Parser Error Reporting:** Detailed line/column error messages.
 - [ ] **Variables Support:** Support for usage of `var.name`.
 - [ ] **Parallel Graph Execution:** Execute independent nodes in parallel.
