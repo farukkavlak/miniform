@@ -1,11 +1,10 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Orchestrator } from '../src/index';
 import { IProvider } from '@miniform/contracts';
 import { StateManager } from '@miniform/state';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-import { Orchestrator } from '../src/index';
+import os from 'node:os';
 
 // Mock Provider for testing
 class MockProvider implements IProvider {
@@ -119,6 +118,28 @@ describe('Orchestrator', () => {
       expect(state.resources['mock_resource.test'].resourceType).toBe('mock_resource');
       expect(state.resources['mock_resource.test'].name).toBe('test');
     });
+
+    it('should handle resources with mixed attribute types', async () => {
+      const config = `
+        resource "mock_resource" "mixed" {
+          name = "test"
+          count = 42
+          enabled = true
+        }
+      `;
+
+      await orchestrator.apply(config);
+
+      const created = mockProvider.getCreatedResources();
+      const [, inputs] = Array.from(created.entries())[0];
+
+      // All values should be extracted from AttributeValue format
+      expect(inputs).toEqual({
+        name: 'test',
+        count: 42,
+        enabled: true,
+      });
+    });
   });
 
   describe('UPDATE Operations', () => {
@@ -230,7 +251,7 @@ describe('Orchestrator', () => {
 
   describe('Complex Scenarios', () => {
     it('should handle mixed operations (create, update, delete)', async () => {
-      // Initial state: create 2 resources
+      // Initial state: create 3 resources
       const initial = `
         resource "mock_resource" "keep" {
           name = "keep_value"
@@ -259,7 +280,6 @@ describe('Orchestrator', () => {
       `;
       await orchestrator.apply(updated);
 
-      // Debug: Check what's in the provider
       const final = mockProvider.getCreatedResources();
 
       // Verify state matches config
@@ -274,6 +294,64 @@ describe('Orchestrator', () => {
       expect(state.resources['mock_resource.update']).toBeDefined();
       expect(state.resources['mock_resource.create']).toBeDefined();
       expect(state.resources['mock_resource.delete']).toBeUndefined();
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle UPDATE with multiple attribute changes', async () => {
+      // Create resource with multiple attributes
+      const createConfig = `
+        resource "mock_resource" "multi" {
+          name = "original"
+          count = 5
+          enabled = true
+        }
+      `;
+      await orchestrator.apply(createConfig);
+
+      // Update multiple attributes
+      const updateConfig = `
+        resource "mock_resource" "multi" {
+          name = "updated"
+          count = 10
+          enabled = false
+        }
+      `;
+      await orchestrator.apply(updateConfig);
+
+      const updated = mockProvider.getCreatedResources();
+      expect(updated.size).toBe(1);
+
+      const [, inputs] = Array.from(updated.entries())[0];
+      expect(inputs).toEqual({
+        name: 'updated',
+        count: 10,
+        enabled: false,
+      });
+    });
+
+    it('should handle empty config (no resources)', async () => {
+      const config = ``;
+
+      await orchestrator.apply(config);
+
+      const created = mockProvider.getCreatedResources();
+      expect(created.size).toBe(0);
+    });
+
+    it('should handle resource with no attributes', async () => {
+      const config = `
+        resource "mock_resource" "empty" {
+        }
+      `;
+
+      await orchestrator.apply(config);
+
+      const created = mockProvider.getCreatedResources();
+      expect(created.size).toBe(1);
+
+      const [, inputs] = Array.from(created.entries())[0];
+      expect(inputs).toEqual({});
     });
   });
 });
