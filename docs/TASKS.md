@@ -27,8 +27,8 @@
 
 **Requirement:** A modular system to manage state, resolve dependencies, and execute changes.
 
-- [ ] **`@miniform/contracts`:** Define shared interfaces (`IResource`, `IProvider`)
-- [ ] **`@miniform/graph`:** Implement DAG (Directed Acyclic Graph) & Topological Sort
+- [x] **`@miniform/contracts`:** Define shared interfaces (`IResource`, `IProvider`)
+- [x] **`@miniform/graph`:** Implement DAG (Directed Acyclic Graph) & Topological Sort
 - [ ] **`@miniform/state`:** Implement JSON reader/writer & Locking mechanism
 - [ ] **`@miniform/planner`:** Diff Engine logic (Config vs State)
 - [ ] **`@miniform/core`:** The Orchestrator that binds everything together
