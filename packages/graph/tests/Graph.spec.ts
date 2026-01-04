@@ -23,7 +23,8 @@ describe('Graph', () => {
     graph.addEdge('A', 'B');
 
     const sorted = graph.topologicalSort();
-    expect(sorted).toEqual(['A', 'B']);
+    // Expect: [['A'], ['B']] or [['A', 'B']] depending on implementation details of simple graph
+    expect(sorted.flat()).toEqual(['A', 'B']);
   });
 
   it('should sort nodes topologically (complex)', () => {
@@ -41,13 +42,13 @@ describe('Graph', () => {
     graph.addEdge('C', 'D');
 
     const sorted = graph.topologicalSort();
-    // A must be first
-    expect(sorted[0]).toBe('A');
-    // D must be last
-    expect(sorted[3]).toBe('D');
-    // B and C are in middle
-    expect(sorted.slice(1, 3)).toContain('B');
-    expect(sorted.slice(1, 3)).toContain('C');
+    // Layers: [['A'], ['B', 'C'], ['D']]
+
+    expect(sorted).toHaveLength(3);
+    expect(sorted[0]).toEqual(['A']);
+    expect(sorted[1]).toContain('B');
+    expect(sorted[1]).toContain('C');
+    expect(sorted[2]).toEqual(['D']);
   });
 
   it('should detect cycles', () => {
@@ -59,6 +60,33 @@ describe('Graph', () => {
     graph.addEdge('B', 'A');
 
     expect(() => graph.topologicalSort()).toThrow(/Cycle/);
+  });
+
+  it('should sort nodes batch-wise (parallel)', () => {
+    // A -> C
+    // B -> C
+    // D (independent)
+    // Expect: [[A, B, D], [C]] or similar layers
+    const graph = new Graph<string>();
+    graph.addNode('A', 'val');
+    graph.addNode('B', 'val');
+    graph.addNode('C', 'val');
+    graph.addNode('D', 'val');
+
+    graph.addEdge('A', 'C');
+    graph.addEdge('B', 'C');
+
+    const batches = graph.topologicalSort();
+
+    // First layer should contain A, B, D (order within layer doesn't matter)
+    expect(batches).toHaveLength(2);
+    expect(batches[0]).toHaveLength(3);
+    expect(batches[0]).toContain('A');
+    expect(batches[0]).toContain('B');
+    expect(batches[0]).toContain('D');
+
+    // Second layer should be C
+    expect(batches[1]).toEqual(['C']);
   });
 
   it('should throw when adding edge from non-existent node', () => {

@@ -19,30 +19,37 @@ export class Graph<T> {
     return this.nodes.get(id);
   }
 
-  /**
-   * Returns nodes in topological order (dependency order).
-   * Throws error if cycle is detected.
+  /*
+   * Returns nodes in topological order, grouped by layers for parallel execution.
+   * Format: [['A', 'B'], ['C']] -> A and B can run in parallel, then C.
    */
-  topologicalSort(): string[] {
+  topologicalSort(): string[][] {
     const inDegree = this.calculateInDegrees();
-    const result: string[] = [];
-    const queue: string[] = [];
+    const result: string[][] = [];
+    let queue: string[] = [];
 
     for (const [node, degree] of inDegree.entries()) if (degree === 0) queue.push(node);
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
-      result.push(current);
+      const currentLayer = [...queue];
+      result.push(currentLayer);
 
-      const neighbors = this.adjacencyList.get(current)!;
-      for (const neighbor of neighbors) {
-        const newDegree = inDegree.get(neighbor)! - 1;
-        inDegree.set(neighbor, newDegree);
-        if (newDegree === 0) queue.push(neighbor);
+      const nextQueue: string[] = [];
+
+      for (const node of currentLayer) {
+        const neighbors = this.adjacencyList.get(node)!;
+        for (const neighbor of neighbors) {
+          const newDegree = inDegree.get(neighbor)! - 1;
+          inDegree.set(neighbor, newDegree);
+          if (newDegree === 0) nextQueue.push(neighbor);
+        }
       }
+
+      queue = nextQueue;
     }
 
-    if (result.length !== this.nodes.size) throw new Error('Dependency Cycle Detected');
+    const totalNodes = result.reduce((acc, layer) => acc + layer.length, 0);
+    if (totalNodes !== this.nodes.size) throw new Error('Dependency Cycle Detected');
 
     return result;
   }
