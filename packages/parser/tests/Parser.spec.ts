@@ -12,26 +12,37 @@ describe('Miniform Parser', () => {
   describe('Valid Cases', () => {
     it('should parse a simple resource block', () => {
       const input = `
-      resource "file" "test" {
-        path = "./test.txt"
-        count = 5
-        active = true
+      resource "mock_resource" "test" {
+        name = "value"
+        count = 42
       }
     `;
       const parser = makeParser(input);
-      const ast = parser.parse();
+      const result = parser.parse();
 
-      expect(ast).toHaveLength(1);
-      expect(ast[0]).toMatchObject({
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
         type: 'Resource',
-        resourceType: 'file',
+        resourceType: 'mock_resource',
         name: 'test',
         attributes: {
-          path: { type: 'String', value: './test.txt' },
-          count: { type: 'Number', value: 5 },
-          active: { type: 'Boolean', value: true },
+          name: { type: 'String', value: 'value' },
+          count: { type: 'Number', value: 42 },
         },
       });
+    });
+
+    it('should parse boolean false value', () => {
+      const input = `
+      resource "mock_resource" "test" {
+        enabled = false
+      }
+    `;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].attributes.enabled).toEqual({ type: 'Boolean', value: false });
     });
 
     it('should parse multiple resources', () => {
