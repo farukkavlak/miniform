@@ -15,8 +15,12 @@ export class Parser {
     return program;
   }
 
+  private statementParsers: Record<string, () => ResourceBlock> = {
+    [TokenType.Resource]: this.parseResource.bind(this),
+  };
+
   private parseStatement(): ResourceBlock {
-    if (this.matchToken(TokenType.Resource)) return this.parseResource();
+    for (const [tokenType, handler] of Object.entries(this.statementParsers)) if (this.matchToken(tokenType as TokenType)) return handler();
     throw new Error(`Unexpected token at line ${this.peek().line}: ${this.peek().value}`);
   }
 

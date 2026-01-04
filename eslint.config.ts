@@ -27,7 +27,7 @@ export default [
       globals: { ...globals.browser, ...globals.node },
     },
   },
-  { ignores: ['**/node_modules/**', '**/dist/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**', '**/coverage/**'] },
   {
     rules: {
       ...js.configs.recommended.rules,
