@@ -66,7 +66,7 @@ describe('LocalProvider', () => {
 
       expect(id).toBe(path.resolve(filePath));
 
-      const fileContent = await fs.readFile(filePath, 'utf-8');
+      const fileContent = await fs.readFile(filePath, 'utf8');
       expect(fileContent).toBe(content);
     });
 
@@ -79,7 +79,7 @@ describe('LocalProvider', () => {
         content,
       });
 
-      const fileContent = await fs.readFile(filePath, 'utf-8');
+      const fileContent = await fs.readFile(filePath, 'utf8');
       expect(fileContent).toBe(content);
     });
 
@@ -98,7 +98,7 @@ describe('LocalProvider', () => {
       const filePath = path.join(tmpDir, 'test.txt');
 
       // Create file first
-      await fs.writeFile(filePath, 'Original content', 'utf-8');
+      await fs.writeFile(filePath, 'Original content', 'utf8');
 
       // Update
       await provider.update(filePath, 'local_file', {
@@ -106,7 +106,7 @@ describe('LocalProvider', () => {
         content: 'Updated content',
       });
 
-      const fileContent = await fs.readFile(filePath, 'utf-8');
+      const fileContent = await fs.readFile(filePath, 'utf8');
       expect(fileContent).toBe('Updated content');
     });
 
@@ -124,7 +124,7 @@ describe('LocalProvider', () => {
       const filePath = path.join(tmpDir, 'test.txt');
 
       // Create file first
-      await fs.writeFile(filePath, 'Content', 'utf-8');
+      await fs.writeFile(filePath, 'Content', 'utf8');
 
       // Verify it exists
       await expect(fs.access(filePath)).resolves.not.toThrow();

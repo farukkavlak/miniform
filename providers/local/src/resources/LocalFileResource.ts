@@ -4,12 +4,9 @@ import path from 'node:path';
 
 export class LocalFileResource implements IResourceHandler {
   async validate(inputs: Record<string, unknown>): Promise<void> {
-    if (!inputs.path || typeof inputs.path !== 'string') {
-      throw new Error('local_file requires "path" attribute (string)');
-    }
-    if (!inputs.content || typeof inputs.content !== 'string') {
-      throw new Error('local_file requires "content" attribute (string)');
-    }
+    if (!inputs.path || typeof inputs.path !== 'string') throw new Error('local_file requires "path" attribute (string)');
+
+    if (!inputs.content || typeof inputs.content !== 'string') throw new Error('local_file requires "content" attribute (string)');
   }
 
   async create(inputs: Record<string, unknown>): Promise<string> {
@@ -21,7 +18,7 @@ export class LocalFileResource implements IResourceHandler {
     await fs.mkdir(dir, { recursive: true });
 
     // Write file
-    await fs.writeFile(filePath, content, 'utf-8');
+    await fs.writeFile(filePath, content, 'utf8');
 
     // Return absolute path as ID
     return path.resolve(filePath);
@@ -31,7 +28,7 @@ export class LocalFileResource implements IResourceHandler {
     const content = inputs.content as string;
 
     // Update file content
-    await fs.writeFile(id, content, 'utf-8');
+    await fs.writeFile(id, content, 'utf8');
   }
 
   async delete(id: string): Promise<void> {

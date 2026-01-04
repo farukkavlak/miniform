@@ -37,12 +37,11 @@ export class Orchestrator {
 
     // 3. Build dependency graph (no data needed, just topology)
     const graph = new Graph<null>();
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Resource') {
         const key = `${stmt.resourceType}.${stmt.name}`;
         graph.addNode(key, null);
       }
-    }
 
     // 4. Generate execution plan
     const allActions = plan(program, currentState);
@@ -53,9 +52,7 @@ export class Orchestrator {
 
     // 6. Execute DELETE actions (not in graph since they're not in desired state)
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
-    for (const action of deleteActions) {
-      await this.executeAction(action, currentState);
-    }
+    for (const action of deleteActions) await this.executeAction(action, currentState);
 
     // 7. Write final state after all operations
     await this.stateManager.write(currentState);
@@ -64,7 +61,7 @@ export class Orchestrator {
   private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState): Promise<void> {
     const layers = graph.topologicalSort();
 
-    for (const layer of layers) {
+    for (const layer of layers)
       // Execute all actions in this layer in parallel
       await Promise.all(
         layer.map(async (resourceKey: string) => {
@@ -74,7 +71,6 @@ export class Orchestrator {
           await this.executeAction(action, currentState);
         })
       );
-    }
   }
 
   private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
@@ -107,9 +103,7 @@ export class Orchestrator {
         const currentResource = currentState.resources[`${action.resourceType}.${action.name}`];
         const newAttributes = { ...currentResource.attributes };
 
-        for (const [key, change] of Object.entries(action.changes)) {
-          if (change.new !== undefined) newAttributes[key] = change.new;
-        }
+        for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
 
         const inputs = this.convertAttributes(newAttributes);
         await provider.validate(action.resourceType, inputs);
@@ -128,23 +122,23 @@ export class Orchestrator {
         break;
       }
 
-      case 'NO_OP':
+      case 'NO_OP': {
         // Do nothing
         break;
+      }
+
+      default:
+        // Should never happen if planner works correctly
+        throw new Error(`Unknown action type: ${action.type}`);
     }
   }
 
   private convertAttributes(attributes: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(attributes)) {
+    for (const [key, value] of Object.entries(attributes))
       // AttributeValue has { type, value } structure
-      if (value && typeof value === 'object' && 'value' in value) {
-        result[key] = value.value;
-      } else {
-        result[key] = value;
-      }
-    }
+      result[key] = value && typeof value === 'object' && 'value' in value ? value.value : value;
 
     return result;
   }
