@@ -29,7 +29,7 @@
 
 - [x] **`@miniform/contracts`:** Define shared interfaces (`IResource`, `IProvider`)
 - [x] **`@miniform/graph`:** Implement DAG (Directed Acyclic Graph) & Topological Sort
-- [ ] **`@miniform/state`:** Implement JSON reader/writer & Locking mechanism
+- [x] **`@miniform/state`:** Implement JSON reader/writer & Locking mechanism
 - [ ] **`@miniform/planner`:** Diff Engine logic (Config vs State)
 - [ ] **`@miniform/core`:** The Orchestrator that binds everything together
 - [ ] **Integration Tests:** Verify simple apply/plan cycles
@@ -71,3 +71,14 @@
   - `aws_s3_bucket`
   - `aws_instance`
 - [ ] **Multi-Provider Support:** Handle `provider "aws" { ... }` and `provider "local" { ... }` in the same graph.
+
+## 7. Technical Debt (Missings)
+
+**Requirement:** List of identified gaps to be addressed in future iterations.
+
+- [ ] **State Locking:** Race condition protection (lock file).
+- [ ] **State Backup:** Atomic writes with backup (.bak) generation.
+- [ ] **Parser Error Reporting:** Detailed line/column error messages.
+- [ ] **Variables Support:** Support for usage of `var.name`.
+- [ ] **Parallel Graph Execution:** Execute independent nodes in parallel.
+- [ ] **Provider Schema Validation:** Runtime validation of inputs in Contracts.
