@@ -1,14 +1,40 @@
 import { IResource } from '@miniform/contracts';
-import { Program, ResourceBlock } from '@miniform/parser';
+import { AttributeValue, Program, ResourceBlock } from '@miniform/parser';
 import { IState } from '@miniform/state';
 
 export type ActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'NO_OP';
+
+
 
 export interface PlanAction {
   type: ActionType;
   resourceType: string;
   name: string;
-  changes?: Record<string, { old: unknown; new: unknown }>;
+  id?: string;
+  attributes?: Record<string, AttributeValue>;
+  changes?: Record<string, { old: AttributeValue | undefined; new: AttributeValue | undefined }>;
+}
+
+function calculateDiff(
+  oldAttrs: Record<string, AttributeValue>,
+  newAttrs: Record<string, AttributeValue>
+): Record<string, { old: AttributeValue | undefined; new: AttributeValue | undefined }> | null {
+  const changes: Record<string, { old: AttributeValue | undefined; new: AttributeValue | undefined }> = {};
+  let hasChanges = false;
+
+  const allKeys = new Set([...Object.keys(oldAttrs), ...Object.keys(newAttrs)]);
+
+  for (const key of allKeys) {
+    const oldValue = oldAttrs[key];
+    const newValue = newAttrs[key];
+
+    if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+      changes[key] = { old: oldValue, new: newValue };
+      hasChanges = true;
+    }
+  }
+
+  return hasChanges ? changes : null;
 }
 
 export function plan(desiredState: Program, currentState: IState): PlanAction[] {
@@ -17,7 +43,6 @@ export function plan(desiredState: Program, currentState: IState): PlanAction[] 
   const desiredMap = new Map<string, ResourceBlock>();
 
   // Map desired resources for easier lookup
-  // Key format: "type.name" (e.g., "local_file.my_file")
   for (const stmt of desiredState)
     if (stmt.type === 'Resource') {
       const key = `${stmt.resourceType}.${stmt.name}`;
@@ -30,21 +55,25 @@ export function plan(desiredState: Program, currentState: IState): PlanAction[] 
 
     if (currentResource) {
       // CASE: UPDATE or NO_OP
-      // Simple comparison for now (JSON stringify)
-      const hasChanges = JSON.stringify(resource.attributes) !== JSON.stringify(currentResource.attributes);
+      const changes = calculateDiff(
+        currentResource.attributes as Record<string, AttributeValue>,
+        resource.attributes
+      );
 
-      if (hasChanges)
+      if (changes)
         actions.push({
           type: 'UPDATE',
           resourceType: resource.resourceType,
           name: resource.name,
-          // TODO: Detailed changes
+          id: currentResource.id,
+          changes,
         });
       else
         actions.push({
           type: 'NO_OP',
           resourceType: resource.resourceType,
           name: resource.name,
+          id: currentResource.id,
         });
     } else
       // CASE: CREATE
@@ -52,6 +81,7 @@ export function plan(desiredState: Program, currentState: IState): PlanAction[] 
         type: 'CREATE',
         resourceType: resource.resourceType,
         name: resource.name,
+        attributes: resource.attributes,
       });
   }
 
@@ -62,6 +92,7 @@ export function plan(desiredState: Program, currentState: IState): PlanAction[] 
         type: 'DELETE',
         resourceType: resource.resourceType,
         name: resource.name,
+        id: resource.id,
       });
 
   return actions;

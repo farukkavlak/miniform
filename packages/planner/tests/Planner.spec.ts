@@ -26,6 +26,8 @@ describe('Planner', () => {
     expect(actions[0].type).toBe('CREATE');
     expect(actions[0].resourceType).toBe('file');
     expect(actions[0].name).toBe('new_file');
+    expect(actions[0].attributes).toBeDefined();
+    expect(actions[0].attributes!['path']).toEqual({ type: 'String', value: 'x' });
   });
 
   it('should plan DELETE for removed resources', () => {
@@ -46,8 +48,7 @@ describe('Planner', () => {
     const actions = plan(desired, current);
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe('DELETE');
-    expect(actions[0].resourceType).toBe('file');
-    expect(actions[0].name).toBe('old_file');
+    expect(actions[0].id).toBe('file.old_file');
   });
 
   it('should plan UPDATE when attributes change', () => {
@@ -76,6 +77,12 @@ describe('Planner', () => {
     const actions = plan(desired, current);
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe('UPDATE');
+    expect(actions[0].id).toBe('file.my_file');
+    expect(actions[0].changes).toBeDefined();
+    expect(actions[0].changes!['path']).toEqual({
+      old: { type: 'String', value: 'old_path' },
+      new: { type: 'String', value: 'new_path' },
+    });
   });
 
   it('should plan NO_OP when identical', () => {
@@ -105,5 +112,6 @@ describe('Planner', () => {
     const actions = plan(desired, current);
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe('NO_OP');
+    expect(actions[0].changes).toBeUndefined();
   });
 });
