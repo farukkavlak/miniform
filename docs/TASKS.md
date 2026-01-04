@@ -101,7 +101,219 @@
 - [x] **Parser Error Reporting:** Detailed line/column error messages.
 - [x] **Variables Support:** Support for usage of `var.name`.
 - [x] **Parallel Graph Execution:** Execute independent nodes in parallel.
-- [x] **Provider Schema Validation:** Runtime validation of inputs in Contracts.
 - [ ] **String Interpolation:** `${var.x}` support (requires Lexer templates).
 - [ ] **Variable Blocks:** `variable "env" { default = "dev" }` parsing.
 - [ ] **Reference Resolution:** Planner logic to resolve `Reference` nodes to values.
+
+---
+
+## 8. Critical Improvements
+
+**See [IMPROVEMENTS.md](./IMPROVEMENTS.md) for detailed analysis.**
+
+### 8.1. Reference Resolution & Dependencies
+
+- [ ] **Reference Resolution in Planner**
+  - [ ] Resolve `local_file.config.path` to actual values
+  - [ ] Resolve `var.region` to variable values
+  - [ ] Detect circular references
+- [ ] **Dependency Detection from References**
+  - [ ] Parse references in attribute values
+  - [ ] Add graph edges based on references
+  - [ ] Validate dependency chains
+- [ ] **String Interpolation**
+  - [ ] Lexer support for `${...}` syntax
+  - [ ] Parser support for template strings
+  - [ ] Runtime interpolation in Orchestrator
+
+### 8.2. Plan Command
+
+- [ ] **`miniform plan` Command**
+  - [ ] Show what will change without applying
+  - [ ] Color-coded output (+ create, ~ update, - delete)
+  - [ ] Resource count summary
+- [ ] **Plan File Support**
+  - [ ] Save plan to file
+  - [ ] Apply from saved plan
+  - [ ] Plan validation
+
+### 8.3. Output Values
+
+- [ ] **Output Block Parsing**
+  - [ ] Parse `output "name" { value = ... }` syntax
+  - [ ] Store outputs in state
+- [ ] **Output Display**
+  - [ ] Show outputs after apply
+  - [ ] `miniform output` command
+  - [ ] JSON output format
+
+### 8.4. Better Error Messages
+
+- [ ] **Contextual Errors**
+  - [ ] Show file/line/column in config
+  - [ ] Highlight problematic code
+  - [ ] Suggest fixes ("did you mean?")
+- [ ] **Provider Errors**
+  - [ ] Better error messages from providers
+  - [ ] Retry suggestions
+  - [ ] Troubleshooting links
+
+---
+
+## 9. High Priority Features
+
+### 9.1. Data Sources
+
+- [ ] **Data Source Parsing**
+  - [ ] `data "type" "name" {}` syntax
+  - [ ] Data source provider interface
+- [ ] **Read-Only Operations**
+  - [ ] Query existing resources
+  - [ ] Use in other resources
+
+### 9.2. State Management Commands
+
+- [ ] **State Inspection**
+  - [ ] `miniform state list`
+  - [ ] `miniform state show <resource>`
+- [ ] **State Manipulation**
+  - [ ] `miniform state rm <resource>`
+  - [ ] `miniform state mv <old> <new>`
+- [ ] **State Import/Export**
+  - [ ] Import existing resources
+  - [ ] Export state to JSON
+
+### 9.3. Validation
+
+- [ ] **Config Validation**
+  - [ ] `miniform validate` command
+  - [ ] Syntax validation
+  - [ ] Provider schema validation
+- [ ] **Dependency Validation**
+  - [ ] Detect circular dependencies
+  - [ ] Validate reference paths
+  - [ ] Check resource existence
+
+### 9.4. Count & For Each
+
+- [ ] **Count Meta-Argument**
+  - [ ] Parse `count = N`
+  - [ ] Create N instances
+  - [ ] Index access `[0]`, `[1]`, etc.
+- [ ] **For Each Meta-Argument**
+  - [ ] Parse `for_each = {...}`
+  - [ ] Iterate over maps/sets
+  - [ ] Key access `each.key`, `each.value`
+
+---
+
+## 10. Medium Priority Features
+
+### 10.1. Modules
+
+- [ ] **Module Parsing**
+  - [ ] `module "name" { source = "..." }` syntax
+  - [ ] Module loading from filesystem
+- [ ] **Module Execution**
+  - [ ] Variable passing to modules
+  - [ ] Output from modules
+  - [ ] Nested modules
+
+### 10.2. Lifecycle Management
+
+- [ ] **Lifecycle Block**
+  - [ ] `create_before_destroy`
+  - [ ] `prevent_destroy`
+  - [ ] `ignore_changes`
+- [ ] **Lifecycle Execution**
+  - [ ] Implement create-before-destroy logic
+  - [ ] Prevent destroy protection
+  - [ ] Selective attribute ignoring
+
+### 10.3. Provisioners
+
+- [ ] **Provisioner Parsing**
+  - [ ] `provisioner "type" {}` syntax
+  - [ ] Multiple provisioners per resource
+- [ ] **Provisioner Types**
+  - [ ] `local-exec`: Run local commands
+  - [ ] `remote-exec`: Run remote commands
+  - [ ] `file`: Copy files
+
+### 10.4. Workspaces
+
+- [ ] **Workspace Management**
+  - [ ] `miniform workspace new <name>`
+  - [ ] `miniform workspace select <name>`
+  - [ ] `miniform workspace list`
+- [ ] **Workspace Isolation**
+  - [ ] Separate state per workspace
+  - [ ] Workspace-specific variables
+
+---
+
+## 11. Nice to Have
+
+### 11.1. Remote State
+
+- [ ] **Backend Interface**
+  - [ ] Generic backend interface
+  - [ ] State locking for remote
+- [ ] **Backend Implementations**
+  - [ ] S3 backend
+  - [ ] Azure Blob backend
+  - [ ] Local backend (default)
+
+### 11.2. Graph Visualization
+
+- [ ] **Graph Generation**
+  - [ ] Generate DOT format
+  - [ ] `miniform graph` command
+- [ ] **Visualization**
+  - [ ] SVG output
+  - [ ] Interactive HTML
+
+### 11.3. Auto-formatting
+
+- [ ] **Format Command**
+  - [ ] `miniform fmt` command
+  - [ ] Consistent indentation
+  - [ ] Sort attributes alphabetically
+
+### 11.4. Language Server (LSP)
+
+- [ ] **LSP Implementation**
+  - [ ] Autocomplete
+  - [ ] Go to definition
+  - [ ] Hover documentation
+- [ ] **IDE Integration**
+  - [ ] VSCode extension
+  - [ ] Syntax highlighting
+
+---
+
+## 12. Performance & Quality
+
+### 12.1. Performance
+
+- [ ] **Optimization**
+  - [ ] Lazy state loading
+  - [ ] Incremental parsing
+  - [ ] Cache provider validations
+- [ ] **Benchmarks**
+  - [ ] Performance benchmarks
+  - [ ] Memory profiling
+  - [ ] Large config handling
+
+### 12.2. Testing
+
+- [ ] **Integration Tests**
+  - [ ] End-to-end tests
+  - [ ] Real provider tests
+  - [ ] Multi-resource scenarios
+- [ ] **Fuzz Testing**
+  - [ ] Parser fuzz testing
+        [ ] State corruption testing
+
+### 12.3. Documentation
+
