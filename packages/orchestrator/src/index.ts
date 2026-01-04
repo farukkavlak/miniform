@@ -79,46 +79,17 @@ export class Orchestrator {
 
     switch (action.type) {
       case 'CREATE': {
-        if (!action.attributes) throw new Error('CREATE action missing attributes');
-
-        const inputs = this.convertAttributes(action.attributes);
-        await provider.validate(action.resourceType, inputs);
-
-        const id = await provider.create(action.resourceType, inputs);
-
-        currentState.resources[`${action.resourceType}.${action.name}`] = {
-          id,
-          type: 'Resource',
-          resourceType: action.resourceType,
-          name: action.name,
-          attributes: action.attributes,
-        };
+        await this.executeCreate(action, provider, currentState);
         break;
       }
 
       case 'UPDATE': {
-        if (!action.id) throw new Error('UPDATE action missing id');
-        if (!action.changes) throw new Error('UPDATE action missing changes');
-
-        const currentResource = currentState.resources[`${action.resourceType}.${action.name}`];
-        const newAttributes = { ...currentResource.attributes };
-
-        for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
-
-        const inputs = this.convertAttributes(newAttributes);
-        await provider.validate(action.resourceType, inputs);
-        await provider.update(action.id, action.resourceType, inputs);
-
-        currentResource.attributes = newAttributes;
+        await this.executeUpdate(action, provider, currentState);
         break;
       }
 
       case 'DELETE': {
-        if (!action.id) throw new Error('DELETE action missing id');
-
-        await provider.delete(action.id);
-
-        delete currentState.resources[`${action.resourceType}.${action.name}`];
+        await this.executeDelete(action, provider, currentState);
         break;
       }
 
@@ -128,10 +99,50 @@ export class Orchestrator {
       }
 
       default: {
-        // Should never happen if planner works correctly
         throw new Error(`Unknown action type: ${action.type}`);
       }
     }
+  }
+
+  private async executeCreate(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
+    if (!action.attributes) throw new Error('CREATE action missing attributes');
+
+    const inputs = this.convertAttributes(action.attributes);
+    await provider.validate(action.resourceType, inputs);
+
+    const id = await provider.create(action.resourceType, inputs);
+
+    currentState.resources[`${action.resourceType}.${action.name}`] = {
+      id,
+      type: 'Resource',
+      resourceType: action.resourceType,
+      name: action.name,
+      attributes: action.attributes,
+    };
+  }
+
+  private async executeUpdate(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
+    if (!action.id) throw new Error('UPDATE action missing id');
+    if (!action.changes) throw new Error('UPDATE action missing changes');
+
+    const currentResource = currentState.resources[`${action.resourceType}.${action.name}`];
+    const newAttributes = { ...currentResource.attributes };
+
+    for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
+
+    const inputs = this.convertAttributes(newAttributes);
+    await provider.validate(action.resourceType, inputs);
+    await provider.update(action.id, action.resourceType, inputs);
+
+    currentResource.attributes = newAttributes;
+  }
+
+  private async executeDelete(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
+    if (!action.id) throw new Error('DELETE action missing id');
+
+    await provider.delete(action.id);
+
+    delete currentState.resources[`${action.resourceType}.${action.name}`];
   }
 
   private convertAttributes(attributes: Record<string, unknown>): Record<string, unknown> {
