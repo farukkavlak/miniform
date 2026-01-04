@@ -66,6 +66,13 @@ describe('Miniform Parser', () => {
       expect(ast).toHaveLength(1);
       expect(ast[0].attributes.key).toBeDefined();
     });
+
+    it('should ignore comment at EOF without newline', () => {
+      const input = `# just a comment`;
+      const parser = makeParser(input);
+      const ast = parser.parse();
+      expect(ast).toHaveLength(0);
+    });
   });
 
   describe('Error Cases', () => {
@@ -119,6 +126,11 @@ describe('Miniform Parser', () => {
       const input = `random_token "type" "name" {}`;
       const parser = makeParser(input);
       expect(() => parser.parse()).toThrow('Unexpected token');
+    });
+
+    it('should throw on invalid character in Lexer', () => {
+      const input = `@`;
+      expect(() => makeParser(input)).toThrow('Unexpected token');
     });
   });
 });

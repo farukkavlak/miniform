@@ -75,7 +75,7 @@ export class Parser {
   }
 
   private advance(): Token {
-    if (!this.isAtEnd()) this.current++;
+    this.current++;
     return this.previous();
   }
 
