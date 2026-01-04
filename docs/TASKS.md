@@ -81,4 +81,4 @@
 - [x] **Parser Error Reporting:** Detailed line/column error messages.
 - [ ] **Variables Support:** Support for usage of `var.name`.
 - [x] **Parallel Graph Execution:** Execute independent nodes in parallel.
-- [ ] **Provider Schema Validation:** Runtime validation of inputs in Contracts.
+- [x] **Provider Schema Validation:** Runtime validation of inputs in Contracts.
