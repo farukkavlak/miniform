@@ -11,7 +11,8 @@
   "license": "ISC",
   "author": "Faruk Kavlak",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "providers/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

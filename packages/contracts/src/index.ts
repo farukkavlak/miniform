@@ -29,3 +29,30 @@ export interface IProvider {
   update(id: string, type: string, inputs: Record<string, unknown>): Promise<void>;
   delete(id: string): Promise<void>;
 }
+
+/**
+ * Resource Handler Interface
+ * Each resource type (e.g., local_file, aws_s3_bucket) implements this interface
+ */
+export interface IResourceHandler {
+  /**
+   * Validate resource inputs before creation/update
+   */
+  validate(inputs: Record<string, unknown>): Promise<void>;
+
+  /**
+   * Create a new resource
+   * @returns Resource ID (e.g., file path, AWS ARN)
+   */
+  create(inputs: Record<string, unknown>): Promise<string>;
+
+  /**
+   * Update an existing resource
+   */
+  update(id: string, inputs: Record<string, unknown>): Promise<void>;
+
+  /**
+   * Delete a resource
+   */
+  delete(id: string): Promise<void>;
+}
