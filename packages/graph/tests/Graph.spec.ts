@@ -64,12 +64,12 @@ describe('Graph', () => {
   it('should throw when adding edge from non-existent node', () => {
     const graph = new Graph<string>();
     graph.addNode('B', 'val');
-    expect(() => graph.addEdge('A', 'B')).toThrow(/node A does not exist/i);
+    expect(() => graph.addEdge('A', 'B')).toThrow(/node a does not exist/i);
   });
 
   it('should throw when adding edge to non-existent node', () => {
     const graph = new Graph<string>();
     graph.addNode('A', 'val');
-    expect(() => graph.addEdge('A', 'Z')).toThrow(/node Z does not exist/i);
+    expect(() => graph.addEdge('A', 'Z')).toThrow(/node z does not exist/i);
   });
 });
