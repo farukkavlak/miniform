@@ -7,7 +7,6 @@ export class LocalProvider implements IProvider {
   private handlers: Map<string, IResourceHandler> = new Map();
 
   constructor() {
-    // Register resource handlers
     this.handlers.set('local_file', new LocalFileResource());
   }
 
@@ -33,8 +32,6 @@ export class LocalProvider implements IProvider {
   }
 
   async delete(id: string): Promise<void> {
-    // Assume it's a file for local provider
-    // In a real implementation, you might store metadata to know which handler to use
     const handler = this.handlers.get('local_file');
     if (handler) await handler.delete(id);
   }
