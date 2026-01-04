@@ -27,7 +27,7 @@ describe('Planner', () => {
     expect(actions[0].resourceType).toBe('file');
     expect(actions[0].name).toBe('new_file');
     expect(actions[0].attributes).toBeDefined();
-    expect(actions[0].attributes!['path']).toEqual({ type: 'String', value: 'x' });
+    expect(actions[0].attributes!.path).toEqual({ type: 'String', value: 'x' });
   });
 
   it('should plan DELETE for removed resources', () => {
@@ -79,7 +79,7 @@ describe('Planner', () => {
     expect(actions[0].type).toBe('UPDATE');
     expect(actions[0].id).toBe('file.my_file');
     expect(actions[0].changes).toBeDefined();
-    expect(actions[0].changes!['path']).toEqual({
+    expect(actions[0].changes!.path).toEqual({
       old: { type: 'String', value: 'old_path' },
       new: { type: 'String', value: 'new_path' },
     });

@@ -4,8 +4,6 @@ import { IState } from '@miniform/state';
 
 export type ActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'NO_OP';
 
-
-
 export interface PlanAction {
   type: ActionType;
   resourceType: string;
@@ -55,10 +53,7 @@ export function plan(desiredState: Program, currentState: IState): PlanAction[] 
 
     if (currentResource) {
       // CASE: UPDATE or NO_OP
-      const changes = calculateDiff(
-        currentResource.attributes as Record<string, AttributeValue>,
-        resource.attributes
-      );
+      const changes = calculateDiff(currentResource.attributes as Record<string, AttributeValue>, resource.attributes);
 
       if (changes)
         actions.push({
