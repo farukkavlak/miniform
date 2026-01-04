@@ -48,4 +48,13 @@ describe('StateManager', () => {
     const readState = await stateManager.read();
     expect(readState).toEqual(mockState);
   });
+
+  it('should throw error for non-ENOENT errors', async () => {
+    // Create a directory with the same name as the state file
+    // This will cause fs.readFile to throw EISDIR (Is a directory)
+    const statePath = path.join(tmpDir, 'test.state.json');
+    await fs.mkdir(statePath);
+
+    await expect(stateManager.read()).rejects.toThrow();
+  });
 });
