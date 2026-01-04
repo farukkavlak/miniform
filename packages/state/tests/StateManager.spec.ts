@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { StateManager } from '../src/StateManager';
+import { IState, StateManager } from '../src/StateManager';
 
 describe('StateManager', () => {
   let tmpDir: string;
@@ -26,13 +26,13 @@ describe('StateManager', () => {
   });
 
   it('should write and read state correctly', async () => {
-    const mockState = {
+    const mockState: IState = {
       version: 1,
       resources: {
-        res1: {
-          type: 'resource',
-          resourceType: 'local_file',
-          name: 'res1',
+        'mock_resource.test_a': {
+          type: 'Resource',
+          resourceType: 'mock_resource',
+          name: 'test_a',
           attributes: { filename: 'foo.txt' },
         },
       },

@@ -19,7 +19,7 @@ export type ISchema = Record<string, ISchemaDefinition>;
 
 /** The contract that ALL providers must implement */
 export interface IProvider {
-  /** Resource types handled by this provider (e.g., ['local_file']) */
+  /** Resource types handled by this provider (e.g., ['custom_resource', 'another_type']) */
   readonly resources: string[];
 
   /** Validates inputs against the resource schema. Throws validation error if invalid. */

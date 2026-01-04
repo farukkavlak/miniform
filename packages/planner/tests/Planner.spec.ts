@@ -9,8 +9,8 @@ describe('Planner', () => {
     const desired: Program = [
       {
         type: 'Resource',
-        resourceType: 'file',
-        name: 'new_file',
+        resourceType: 'mock_resource',
+        name: 'test_resource_a',
         attributes: { path: { type: 'String', value: 'x' } },
       },
     ];
@@ -24,8 +24,8 @@ describe('Planner', () => {
 
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe('CREATE');
-    expect(actions[0].resourceType).toBe('file');
-    expect(actions[0].name).toBe('new_file');
+    expect(actions[0].resourceType).toBe('mock_resource');
+    expect(actions[0].name).toBe('test_resource_a');
     expect(actions[0].attributes).toBeDefined();
     expect(actions[0].attributes!.path).toEqual({ type: 'String', value: 'x' });
   });
@@ -35,11 +35,11 @@ describe('Planner', () => {
     const current: IState = {
       version: 1,
       resources: {
-        'file.old_file': {
-          id: 'file.old_file',
+        'mock_resource.test_resource_b': {
+          id: 'mock_resource.test_resource_b',
           type: 'Resource',
-          resourceType: 'file',
-          name: 'old_file',
+          resourceType: 'mock_resource',
+          name: 'test_resource_b',
           attributes: {},
         },
       },
@@ -48,15 +48,15 @@ describe('Planner', () => {
     const actions = plan(desired, current);
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe('DELETE');
-    expect(actions[0].id).toBe('file.old_file');
+    expect(actions[0].id).toBe('mock_resource.test_resource_b');
   });
 
   it('should plan UPDATE when attributes change', () => {
     const desired: Program = [
       {
         type: 'Resource',
-        resourceType: 'file',
-        name: 'my_file',
+        resourceType: 'mock_resource',
+        name: 'test_resource_c',
         attributes: { path: { type: 'String', value: 'new_path' } },
       },
     ];
@@ -64,11 +64,11 @@ describe('Planner', () => {
     const current: IState = {
       version: 1,
       resources: {
-        'file.my_file': {
-          id: 'file.my_file',
+        'mock_resource.test_resource_c': {
+          id: 'mock_resource.test_resource_c',
           type: 'Resource',
-          resourceType: 'file',
-          name: 'my_file',
+          resourceType: 'mock_resource',
+          name: 'test_resource_c',
           attributes: { path: { type: 'String', value: 'old_path' } },
         },
       },
@@ -77,7 +77,7 @@ describe('Planner', () => {
     const actions = plan(desired, current);
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe('UPDATE');
-    expect(actions[0].id).toBe('file.my_file');
+    expect(actions[0].id).toBe('mock_resource.test_resource_c');
     expect(actions[0].changes).toBeDefined();
     expect(actions[0].changes!.path).toEqual({
       old: { type: 'String', value: 'old_path' },
@@ -90,8 +90,8 @@ describe('Planner', () => {
     const desired: Program = [
       {
         type: 'Resource',
-        resourceType: 'file',
-        name: 'my_file',
+        resourceType: 'mock_resource',
+        name: 'test_resource_d',
         attributes: attributes,
       },
     ];
@@ -99,11 +99,11 @@ describe('Planner', () => {
     const current: IState = {
       version: 1,
       resources: {
-        'file.my_file': {
-          id: 'file.my_file',
+        'mock_resource.test_resource_d': {
+          id: 'mock_resource.test_resource_d',
           type: 'Resource',
-          resourceType: 'file',
-          name: 'my_file',
+          resourceType: 'mock_resource',
+          name: 'test_resource_d',
           attributes: attributes,
         },
       },
