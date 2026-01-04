@@ -29,7 +29,7 @@
 
 - [x] **`@miniform/contracts`:** Define shared interfaces (`IResource`, `IProvider`)
 - [x] **`@miniform/graph`:** Implement DAG (Directed Acyclic Graph) & Topological Sort
-- [ ] **`@miniform/state`:** Implement JSON reader/writer & Locking mechanism
+- [x] **`@miniform/state`:** Implement JSON reader/writer & Locking mechanism
 - [ ] **`@miniform/planner`:** Diff Engine logic (Config vs State)
 - [ ] **`@miniform/core`:** The Orchestrator that binds everything together
 - [ ] **Integration Tests:** Verify simple apply/plan cycles
