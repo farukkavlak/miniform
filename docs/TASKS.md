@@ -27,11 +27,17 @@
 
 **Requirement:** A modular system to manage state, resolve dependencies, and execute changes.
 
-- [x] **`@miniform/contracts`:** Define shared interfaces (`IResource`, `IProvider`)
-- [x] **`@miniform/graph`:** Implement DAG (Directed Acyclic Graph) & Topological Sort
-- [x] **`@miniform/state`:** Implement JSON reader/writer & Locking mechanism
-- [ ] **`@miniform/planner`:** Diff Engine logic (Config vs State)
-- [ ] **`@miniform/core`:** The Orchestrator that binds everything together
+- [x] **Implement Modular Core Engine** (`@miniform/contracts`, `@miniform/graph`, `@miniform/state`, `@miniform/planner`, `@miniform/orchestrator`)
+  - [x] Define `IResource`, `IProvider` interfaces
+  - [x] Implement Schema Validation (Runtime type checking)
+  - [x] Implement DAG & Topological Sort (No deps)
+  - [x] Implement Parallel Execution (Batch-wise layers)
+  - [x] Basic State Manager (JSON I/O)
+  - [x] Implement Locking & Backup (Reliability)
+  - [x] Enhance Error Reporting (Line/Col in Parser)
+  - [x] Implement Variables Support (`var.name` references)
+  - [x] Implement Diff Engine (Plan logic)
+  - [x] Implement Orchestrator (Runner)
 - [ ] **Integration Tests:** Verify simple apply/plan cycles
 
 ## 4. Providers & Resource Coverage
