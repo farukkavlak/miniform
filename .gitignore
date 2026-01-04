@@ -19,3 +19,4 @@ build
 miniform.state.json
 *.mini.json
 *.log
+*.tsbuildinfo

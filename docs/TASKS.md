@@ -1,5 +1,9 @@
 # Miniform Execution Checklist
 
+## 0. Architectural Standards
+
+**Constraint:** Zero Runtime Dependencies (Only devDependencies allowed).
+
 ## 1. Project Initialization
 
 **Requirement:** Setup a TypeScript Node.js environment.
@@ -12,8 +16,8 @@
 
 **Requirement:** A custom, clean syntax for defining resources.
 
-- [ ] **Grammar Design:** Define allowed tokens and structure
-- [ ] **Lexer:** Implement tokenizer to convert string input -> Tokens
+- [x] **Grammar Design:** Define allowed tokens and structure
+- [x] **Lexer:** Implement tokenizer to convert string input -> Tokens
 - [ ] **Parser:** Implement parser to convert Tokens -> AST (Abstract Syntax Tree)
 - [ ] **Unit Tests:** Verify handling of valid/invalid syntax
 
