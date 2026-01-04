@@ -2,9 +2,9 @@
 
 ## 1. Project Initialization
 **Requirement:** Setup a TypeScript Node.js environment.
-- [ ] Initialize `package.json`
-- [ ] Configure `tsconfig.json` for strict typing
-- [ ] Add linting tools (ESLint/Prettier)
+- [x] Initialize `package.json`
+- [x] Configure `tsconfig.json` for strict typing
+- [x] Add linting tools (ESLint/Prettier)
 
 ## 2. Syntax & Parsing (The DSL)
 **Requirement:** A custom, clean syntax for defining resources.
