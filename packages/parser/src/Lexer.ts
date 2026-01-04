@@ -89,7 +89,6 @@ export class Lexer {
   }
 
   private advance(text: string) {
-    // Update line and column
     for (const char of text)
       if (char === '\n') {
         this.line++;

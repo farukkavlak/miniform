@@ -16,7 +16,6 @@ export class Parser {
   }
 
   private parseStatement(): ResourceBlock {
-    // Current only supports 'resource' blocks
     if (this.matchToken(TokenType.Resource)) return this.parseResource();
     throw new Error(`Unexpected token at line ${this.peek().line}: ${this.peek().value}`);
   }
@@ -52,8 +51,6 @@ export class Parser {
     if (this.matchToken(TokenType.Boolean)) return { type: 'Boolean', value: this.previous().value === 'true' };
     throw new Error(`Unexpected value at line ${this.peek().line}: ${this.peek().value}`);
   }
-
-  // --- Helpers ---
 
   private matchToken(...types: TokenType[]): boolean {
     for (const type of types)
