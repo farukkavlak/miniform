@@ -1,6 +1,6 @@
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { StateManager } from '../src/StateManager';
@@ -41,7 +41,8 @@ describe('StateManager', () => {
     await stateManager.write(mockState);
 
     // Verify file exists
-    const fileContent = await fs.readFile(path.join(tmpDir, 'test.state.json'), 'utf-8');
+    // eslint-disable-next-line unicorn/prefer-json-parse-buffer
+    const fileContent = await fs.readFile(path.join(tmpDir, 'test.state.json'), 'utf8');
     expect(JSON.parse(fileContent)).toEqual(mockState);
 
     // Verify read method

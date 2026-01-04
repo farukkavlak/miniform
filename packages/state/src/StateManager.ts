@@ -1,6 +1,6 @@
 import { IResource } from '@miniform/contracts';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import path from 'node:path';
 
 export interface IState {
   version: number;
@@ -16,20 +16,18 @@ export class StateManager {
 
   async read(): Promise<IState> {
     try {
-      const content = await fs.readFile(this.filePath, 'utf-8');
-      return JSON.parse(content) as IState;
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        // Return empty state if file doesn't exist
-        return { version: 1, resources: {} };
-      }
+      const content = await fs.readFile(this.filePath);
+      return JSON.parse(content.toString('utf8')) as IState;
+    } catch (error) {
+      const err = error as { code?: string };
+      if (err.code === 'ENOENT') return { version: 1, resources: {} };
       throw error;
     }
   }
 
   async write(state: IState): Promise<void> {
     const content = JSON.stringify(state, null, 2);
-    await fs.writeFile(this.filePath, content, 'utf-8');
+    await fs.writeFile(this.filePath, content, 'utf8');
   }
 
   // TODO: Implement lock mechanism using a separate .lock file
