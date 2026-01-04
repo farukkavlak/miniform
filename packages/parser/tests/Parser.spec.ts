@@ -73,6 +73,28 @@ describe('Miniform Parser', () => {
       const ast = parser.parse();
       expect(ast).toHaveLength(0);
     });
+
+    it('should parse variable references', () => {
+      const input = `resource "r" "n" { ref = other_resource.field }`;
+      const parser = makeParser(input);
+      const ast = parser.parse();
+
+      expect(ast[0].attributes.ref).toEqual({
+        type: 'Reference',
+        value: ['other_resource', 'field'],
+      });
+    });
+
+    it('should parse deep references', () => {
+      const input = `resource "r" "n" { ref = a.b.c.d }`;
+      const parser = makeParser(input);
+      const ast = parser.parse();
+
+      expect(ast[0].attributes.ref).toEqual({
+        type: 'Reference',
+        value: ['a', 'b', 'c', 'd'],
+      });
+    });
   });
 
   describe('Error Cases', () => {

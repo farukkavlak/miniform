@@ -7,6 +7,7 @@ export enum TokenType {
   LBrace = 'LBRACE', // {
   RBrace = 'RBRACE', // }
   Assign = 'ASSIGN', // =
+  Dot = 'DOT', // . (for references)
   EOF = 'EOF', // End of File
 }
 

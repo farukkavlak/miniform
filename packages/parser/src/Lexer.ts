@@ -20,6 +20,7 @@ export class Lexer {
     { type: TokenType.Number, regex: /^\d+/ },
     { type: TokenType.LBrace, regex: /^{/ },
     { type: TokenType.RBrace, regex: /^}/ },
+    { type: TokenType.Dot, regex: /^\./ },
     { type: TokenType.Assign, regex: /^=/ },
   ];
 

@@ -79,6 +79,9 @@
 - [x] **State Locking:** Race condition protection (lock file).
 - [x] **State Backup:** Atomic writes with backup (.bak) generation.
 - [x] **Parser Error Reporting:** Detailed line/column error messages.
-- [ ] **Variables Support:** Support for usage of `var.name`.
+- [x] **Variables Support:** Support for usage of `var.name`.
 - [x] **Parallel Graph Execution:** Execute independent nodes in parallel.
 - [x] **Provider Schema Validation:** Runtime validation of inputs in Contracts.
+- [ ] **String Interpolation:** `${var.x}` support (requires Lexer templates).
+- [ ] **Variable Blocks:** `variable "env" { default = "dev" }` parsing.
+- [ ] **Reference Resolution:** Planner logic to resolve `Reference` nodes to values.

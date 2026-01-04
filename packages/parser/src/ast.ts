@@ -1,7 +1,4 @@
-export interface AttributeValue {
-  type: 'String' | 'Number' | 'Boolean';
-  value: string | number | boolean;
-}
+export type AttributeValue = { type: 'String'; value: string } | { type: 'Number'; value: number } | { type: 'Boolean'; value: boolean } | { type: 'Reference'; value: string[] }; // e.g., ["aws_s3", "my_bucket", "name"]
 
 export interface ResourceBlock {
   type: 'Resource';

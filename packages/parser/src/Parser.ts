@@ -53,6 +53,23 @@ export class Parser {
     if (this.matchToken(TokenType.String)) return { type: 'String', value: this.previous().value };
     if (this.matchToken(TokenType.Number)) return { type: 'Number', value: Number(this.previous().value) };
     if (this.matchToken(TokenType.Boolean)) return { type: 'Boolean', value: this.previous().value === 'true' };
+
+    // Reference Parsing: identifier.key.subkey
+    if (this.check(TokenType.Identifier)) {
+      const parts: string[] = [];
+
+      // First part
+      parts.push(this.advance().value);
+
+      // Subsequent parts (dot separated)
+      while (this.matchToken(TokenType.Dot)) {
+        const part = this.consume(TokenType.Identifier, 'Expect property name after dot.');
+        parts.push(part.value);
+      }
+
+      return { type: 'Reference', value: parts };
+    }
+
     return this.error(`Unexpected value: ${this.peek().value}`);
   }
 
