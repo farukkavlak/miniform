@@ -21,7 +21,7 @@ export class Parser {
 
   private parseStatement(): ResourceBlock {
     for (const [tokenType, handler] of Object.entries(this.statementParsers)) if (this.matchToken(tokenType as TokenType)) return handler();
-    throw new Error(`Unexpected token at line ${this.peek().line}: ${this.peek().value}`);
+    return this.error(`Unexpected token: ${this.peek().value}`);
   }
 
   private parseResource(): ResourceBlock {
@@ -53,7 +53,7 @@ export class Parser {
     if (this.matchToken(TokenType.String)) return { type: 'String', value: this.previous().value };
     if (this.matchToken(TokenType.Number)) return { type: 'Number', value: Number(this.previous().value) };
     if (this.matchToken(TokenType.Boolean)) return { type: 'Boolean', value: this.previous().value === 'true' };
-    throw new Error(`Unexpected value at line ${this.peek().line}: ${this.peek().value}`);
+    return this.error(`Unexpected value: ${this.peek().value}`);
   }
 
   private matchToken(...types: TokenType[]): boolean {
@@ -67,7 +67,12 @@ export class Parser {
 
   private consume(type: TokenType, message: string): Token {
     if (this.check(type)) return this.advance();
-    throw new Error(`${message} At line ${this.peek().line}`);
+    return this.error(message);
+  }
+
+  private error(message: string): never {
+    const token = this.peek();
+    throw new Error(`[Line ${token.line}, Column ${token.column}] ${message}`);
   }
 
   private check(type: TokenType): boolean {

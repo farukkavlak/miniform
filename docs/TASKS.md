@@ -78,7 +78,7 @@
 
 - [x] **State Locking:** Race condition protection (lock file).
 - [x] **State Backup:** Atomic writes with backup (.bak) generation.
-- [ ] **Parser Error Reporting:** Detailed line/column error messages.
+- [x] **Parser Error Reporting:** Detailed line/column error messages.
 - [ ] **Variables Support:** Support for usage of `var.name`.
 - [ ] **Parallel Graph Execution:** Execute independent nodes in parallel.
 - [ ] **Provider Schema Validation:** Runtime validation of inputs in Contracts.

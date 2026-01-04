@@ -77,60 +77,75 @@ describe('Miniform Parser', () => {
 
   describe('Error Cases', () => {
     it('should throw on missing resource type', () => {
-      const input = `resource "name" { key = "val" }`; // Missing type string, got "name" (which is parsed as type actually, but let's see)
-      // Actually \`resource "name" {\` -> type="name", missing name string.
-      // Expectation: current parser consumes 2 strings.
-      // \`resource "name" {\` -> consumes "name" as type. Then sees \`{\`. Expects string (name).
+      const input = `resource "name" { key = "val" }`;
+      // resource (1:1) "name" (1:10) { (1:17) ...
+      // Consumes "name" as type. Then sees {. Expects string (name).
+      // Token at { is Line 1, Column 17.
       const parser = makeParser(input);
-      expect(() => parser.parse()).toThrow('Expect resource name string');
+      expect(() => parser.parse()).toThrow('[Line 1, Column 17] Expect resource name string');
     });
 
     it('should throw on missing resource name', () => {
       const input = `resource "type" { key = "val" }`;
-      // Consumes "type". Next is \`{\`. Expects name string.
+      // resource (1:1) "type" (1:10) { (1:17)
+      // Consumes "type". Next is {. Expects name string.
+      // Token at { is Line 1, Column 17.
       const parser = makeParser(input);
-      expect(() => parser.parse()).toThrow('Expect resource name string');
+      expect(() => parser.parse()).toThrow('[Line 1, Column 17] Expect resource name string');
     });
 
     it('should throw on missing opening brace', () => {
       const input = `resource "type" "name" key = "val"`;
+      // resource "type" "name" key (1:24)
+      // Expects {. Got key (Identifier).
       const parser = makeParser(input);
-      expect(() => parser.parse()).toThrow("Expect '{'");
+      expect(() => parser.parse()).toThrow("[Line 1, Column 24] Expect '{'");
     });
 
     it('should throw on missing closing brace', () => {
       const input = `resource "type" "name" { key = "val"`;
+      // EOF is next.
+      // resource "type" "name" { key = "val" <EOF>
+      // Lexer puts EOF at end.
+      // Line 1. Column 37 (length is 36, so 37)
       const parser = makeParser(input);
-      expect(() => parser.parse()).toThrow("Expect '}'");
+      expect(() => parser.parse()).toThrow("[Line 1, Column 37] Expect '}'");
     });
 
     it('should throw on invalid attribute syntax (missing =)', () => {
       const input = `resource "type" "name" { key "val" }`;
+      // key (1:26), "val" (1:30)
+      // Expects =. Got "val" (String).
       const parser = makeParser(input);
-      expect(() => parser.parse()).toThrow("Expect '='");
+      expect(() => parser.parse()).toThrow("[Line 1, Column 30] Expect '='");
     });
 
     it('should throw on invalid attribute key (not identifier)', () => {
-      const input = `resource "type" "name" { "key" = "val" }`; // Key expects identifier, got string
+      const input = `resource "type" "name" { "key" = "val" }`;
+      // "key" is String at 1:26. Expect identifier.
       const parser = makeParser(input);
-      expect(() => parser.parse()).toThrow('Expect attribute name');
+      expect(() => parser.parse()).toThrow('[Line 1, Column 26] Expect attribute name');
     });
 
     it('should throw on invalid value type', () => {
-      const input = `resource "type" "name" { key = resource }`; // 'resource' is a keyword, not a valid value
+      const input = `resource "type" "name" { key = resource }`;
+      // resource is Keyword at 1:32.
       const parser = makeParser(input);
-      expect(() => parser.parse()).toThrow('Unexpected value');
+      expect(() => parser.parse()).toThrow('[Line 1, Column 32] Unexpected value: resource');
     });
 
     it('should throw on unexpected tokens at top level', () => {
       const input = `random_token "type" "name" {}`;
+      // random_token is Identifier at 1:1.
       const parser = makeParser(input);
-      expect(() => parser.parse()).toThrow('Unexpected token');
+      expect(() => parser.parse()).toThrow('[Line 1, Column 1] Unexpected token: random_token');
     });
 
     it('should throw on invalid character in Lexer', () => {
       const input = `@`;
-      expect(() => makeParser(input)).toThrow('Unexpected token');
+      // Lexer throws its own error format.
+      // "Unexpected token at line 1, column 1: "@""
+      expect(() => makeParser(input)).toThrow('Unexpected token at line 1, column 1: "@"');
     });
   });
 });
