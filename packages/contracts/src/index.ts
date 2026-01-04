@@ -1,5 +1,6 @@
 /** Represents a resource definition from the parser (Code -> AST) */
 export interface IResource {
+  id?: string;
   type: string;
   resourceType: string;
   name: string;
