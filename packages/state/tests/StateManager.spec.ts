@@ -41,9 +41,8 @@ describe('StateManager', () => {
     await stateManager.write(mockState);
 
     // Verify file exists
-    // eslint-disable-next-line unicorn/prefer-json-parse-buffer
-    const fileContent = await fs.readFile(path.join(tmpDir, 'test.state.json'), 'utf8');
-    expect(JSON.parse(fileContent)).toEqual(mockState);
+    const fileContent = await fs.readFile(path.join(tmpDir, 'test.state.json'));
+    expect(JSON.parse(fileContent.toString('utf-8'))).toEqual(mockState);
 
     // Verify read method
     const readState = await stateManager.read();
