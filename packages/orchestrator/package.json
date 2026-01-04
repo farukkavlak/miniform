@@ -1,0 +1,23 @@
+{
+  "name": "@miniform/orchestrator",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "vitest run --coverage",
+    "type:check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@miniform/contracts": "*",
+    "@miniform/graph": "*",
+    "@miniform/parser": "*",
+    "@miniform/planner": "*",
+    "@miniform/state": "*"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^0.34.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0"
+  }
+}
