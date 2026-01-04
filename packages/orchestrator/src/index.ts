@@ -54,7 +54,7 @@ export class Orchestrator {
     // 6. Execute DELETE actions (not in graph since they're not in desired state)
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
     for (const action of deleteActions) {
-      await this.executeAction(action, currentState); // Pass currentState
+      await this.executeAction(action, currentState);
     }
 
     // 7. Write final state after all operations
@@ -71,11 +71,10 @@ export class Orchestrator {
           const action = actions.find((a) => `${a.resourceType}.${a.name}` === resourceKey);
           if (!action) return;
 
-          await this.executeAction(action, currentState); // Pass currentState
+          await this.executeAction(action, currentState);
         })
       );
     }
-    // State is written at the end of apply, no need to write here
   }
 
   private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
@@ -86,13 +85,11 @@ export class Orchestrator {
       case 'CREATE': {
         if (!action.attributes) throw new Error('CREATE action missing attributes');
 
-        // Convert AttributeValue to plain object
         const inputs = this.convertAttributes(action.attributes);
         await provider.validate(action.resourceType, inputs);
 
         const id = await provider.create(action.resourceType, inputs);
 
-        // Update state (will be written at the end of apply)
         currentState.resources[`${action.resourceType}.${action.name}`] = {
           id,
           type: 'Resource',
@@ -107,7 +104,6 @@ export class Orchestrator {
         if (!action.id) throw new Error('UPDATE action missing id');
         if (!action.changes) throw new Error('UPDATE action missing changes');
 
-        // Build new attributes from changes
         const currentResource = currentState.resources[`${action.resourceType}.${action.name}`];
         const newAttributes = { ...currentResource.attributes };
 
@@ -119,7 +115,6 @@ export class Orchestrator {
         await provider.validate(action.resourceType, inputs);
         await provider.update(action.id, action.resourceType, inputs);
 
-        // Update state (will be written at the end of apply)
         currentResource.attributes = newAttributes;
         break;
       }
@@ -129,7 +124,6 @@ export class Orchestrator {
 
         await provider.delete(action.id);
 
-        // Update state (will be written at the end of apply)
         delete currentState.resources[`${action.resourceType}.${action.name}`];
         break;
       }
