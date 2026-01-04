@@ -25,9 +25,13 @@
 
 **Requirement:** A system to manage state, resolve dependencies, and execute changes.
 
-- [ ] **State Management:** Implement JSON reader/writer for `miniform.state.json`
-- [ ] **Graph System:** Implement DAG (Directed Acyclic Graph) for dependency sorting
-- [ ] **Diff Engine:** Logic to compare _Desired State_ (Config) vs _Actual State_ (JSON)
+**Requirement:** A modular system to manage state, resolve dependencies, and execute changes.
+
+- [ ] **`@miniform/contracts`:** Define shared interfaces (`IResource`, `IProvider`)
+- [ ] **`@miniform/graph`:** Implement DAG (Directed Acyclic Graph) & Topological Sort
+- [ ] **`@miniform/state`:** Implement JSON reader/writer & Locking mechanism
+- [ ] **`@miniform/planner`:** Diff Engine logic (Config vs State)
+- [ ] **`@miniform/core`:** The Orchestrator that binds everything together
 - [ ] **Integration Tests:** Verify simple apply/plan cycles
 
 ## 4. Providers & Resource Coverage
