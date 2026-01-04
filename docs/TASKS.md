@@ -18,8 +18,8 @@
 
 - [x] **Grammar Design:** Define allowed tokens and structure
 - [x] **Lexer:** Implement tokenizer to convert string input -> Tokens
-- [ ] **Parser:** Implement parser to convert Tokens -> AST (Abstract Syntax Tree)
-- [ ] **Unit Tests:** Verify handling of valid/invalid syntax
+- [x] **Parser:** Implement parser to convert Tokens -> AST (Abstract Syntax Tree)
+- [x] **Unit Tests:** Verify handling of valid/invalid syntax
 
 ## 3. Core Engine Logic
 
@@ -107,11 +107,60 @@
 
 ---
 
-## 8. Critical Improvements
+## 8. Differentiation Features
 
-**See [IMPROVEMENTS.md](./IMPROVEMENTS.md) for detailed analysis.**
+### 8.1. TypeScript Config Support
 
-### 8.1. Reference Resolution & Dependencies
+- [ ] **Config File Support**
+  - [ ] Parse `miniform.config.ts` files
+  - [ ] `defineConfig` helper function
+  - [ ] Type definitions for resources
+  - [ ] Compile-time validation
+- [ ] **Type Safety**
+  - [ ] Provider type definitions
+  - [ ] Resource attribute types
+  - [ ] IDE autocomplete support
+
+### 8.2. Programmatic API
+
+- [ ] **Core API**
+  - [ ] Export `Miniform` class
+  - [ ] `plan()` method
+  - [ ] `apply()` method
+  - [ ] `destroy()` method
+- [ ] **Event System**
+  - [ ] Progress events
+  - [ ] Error events
+  - [ ] Completion events
+- [ ] **Structured Results**
+  - [ ] Return plan details
+  - [ ] Return apply results
+  - [ ] Resource metadata
+
+### 8.3. Unique Features
+
+- [ ] **Resource Snapshots**
+  - [ ] `miniform snapshot create`
+  - [ ] `miniform snapshot rollback`
+  - [ ] `miniform snapshot list`
+  - [ ] Snapshot diff
+- [ ] **Visual Diff**
+  - [ ] HTML diff generation
+  - [ ] Syntax highlighting
+  - [ ] Interactive UI
+  - [ ] Export functionality
+- [ ] **Cost Estimation**
+  - [ ] Cost provider interface
+  - [ ] AWS cost data
+  - [ ] Azure cost data
+  - [ ] Cost calculation
+  - [ ] Cost diff
+
+---
+
+## 9. Core Features
+
+### 9.1. Reference Resolution & Dependencies
 
 - [ ] **Reference Resolution in Planner**
   - [ ] Resolve `local_file.config.path` to actual values
@@ -316,4 +365,3 @@
         [ ] State corruption testing
 
 ### 12.3. Documentation
-
