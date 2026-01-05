@@ -12,6 +12,8 @@ class MockProvider implements IProvider {
   readonly resources = ['mock_resource'];
   private createdResources: Map<string, Record<string, unknown>> = new Map();
 
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getSchema(_type: string): Promise<ISchema> {
     return {};
   }
