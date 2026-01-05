@@ -130,7 +130,7 @@ describe('LocalProvider', () => {
       await expect(fs.access(filePath)).resolves.not.toThrow();
 
       // Delete
-      await provider.delete(filePath);
+      await provider.delete(filePath, 'local_file');
 
       // Verify it's gone
       await expect(fs.access(filePath)).rejects.toThrow();
@@ -140,6 +140,126 @@ describe('LocalProvider', () => {
   describe('Resources', () => {
     it('should expose local_file as supported resource', () => {
       expect(provider.resources).toContain('local_file');
+    });
+  });
+
+  describe('random_string', () => {
+    it('should validate length', async () => {
+      await expect(provider.validate('random_string', { length: 10 })).resolves.not.toThrow();
+      await expect(provider.validate('random_string', {})).rejects.toThrow();
+      await expect(provider.validate('random_string', { length: 0 })).rejects.toThrow();
+      await expect(provider.validate('random_string', { length: -5 })).rejects.toThrow();
+    });
+
+    it('should create a random string of specified length', async () => {
+      const id = await provider.create('random_string', { length: 16 });
+      expect(typeof id).toBe('string');
+      expect(id).toHaveLength(16);
+    });
+
+    it('should create a random string with special characters', async () => {
+      const id = await provider.create('random_string', { length: 50, special: true });
+      expect(id).toHaveLength(50);
+      const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      const hasSpecial = id.split('').some((char) => specialChars.includes(char));
+      expect(hasSpecial).toBe(true);
+    });
+
+    it('should not update (no-op)', async () => {
+      // Just ensure it doesn't throw
+      await expect(provider.update('any-id', 'random_string', { length: 10 })).resolves.not.toThrow();
+    });
+  });
+
+  describe('null_resource', () => {
+    it('should validate anything', async () => {
+      await expect(provider.validate('null_resource', { any: 'thing' })).resolves.not.toThrow();
+    });
+
+    it('should create and return a UUID', async () => {
+      const id = await provider.create('null_resource', {});
+      expect(id).toMatch(/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i);
+    });
+
+    it('should not update (no-op)', async () => {
+      await expect(provider.update('any-id', 'null_resource', {})).resolves.not.toThrow();
+    });
+
+    it('should not delete (no-op)', async () => {
+      await expect(provider.delete('any-id', 'null_resource')).resolves.not.toThrow();
+    });
+  });
+
+  describe('command_exec', () => {
+    it('should validate command', async () => {
+      await expect(provider.validate('command_exec', { command: 'echo hello' })).resolves.not.toThrow();
+      await expect(provider.validate('command_exec', {})).rejects.toThrow();
+    });
+
+    it('should execute a command', async () => {
+      const id = await provider.create('command_exec', { command: 'echo hello world' });
+      expect(id).toBeDefined();
+    });
+
+    it('should execute a command with cwd', async () => {
+      const id = await provider.create('command_exec', { command: 'pwd', cwd: '.' });
+      expect(id).toBeDefined();
+    });
+
+    it('should fail if command fails', async () => {
+      await expect(provider.create('command_exec', { command: 'exit 1' })).rejects.toThrow();
+    });
+
+    it('should re-execute on update', async () => {
+      await expect(provider.update('any-id', 'command_exec', { command: 'echo updated' })).resolves.not.toThrow();
+    });
+
+    it('should not delete (no-op)', async () => {
+      await expect(provider.delete('any-id', 'command_exec')).resolves.not.toThrow();
+    });
+  });
+
+  describe('delete (generic)', () => {
+    it('should not throw when deleting non-file resources', async () => {
+      // Pass correct type, should be no-op for random_string
+      await expect(provider.delete('some-random-id', 'random_string')).resolves.not.toThrow();
+    });
+
+    it('should throw for unknown types', async () => {
+      await expect(provider.delete('id', 'unknown_type')).rejects.toThrow('Unsupported resource type');
+    });
+  });
+
+  describe('getSchema', () => {
+    it('should return schema for random_string', async () => {
+      const schema = await provider.getSchema('random_string');
+      expect(schema).toBeDefined();
+      expect(schema.length).toBeDefined();
+      expect(schema.length.forceNew).toBe(true);
+    });
+
+    it('should return schema for local_file', async () => {
+      const schema = await provider.getSchema('local_file');
+      expect(schema).toBeDefined();
+      expect(schema.path).toBeDefined();
+      expect(schema.path.forceNew).toBe(true);
+    });
+
+    it('should return schema for command_exec', async () => {
+      const schema = await provider.getSchema('command_exec');
+      expect(schema).toBeDefined();
+      expect(schema.command).toBeDefined();
+      expect(schema.command.forceNew).toBe(false);
+    });
+
+    it('should return schema for null_resource', async () => {
+      const schema = await provider.getSchema('null_resource');
+      expect(schema).toBeDefined();
+      expect(Object.keys(schema)).toHaveLength(0);
+    });
+
+    it('should throw for unknown types', async () => {
+      await expect(provider.getSchema('unknown_type')).rejects.toThrow('Unsupported resource type');
     });
   });
 });

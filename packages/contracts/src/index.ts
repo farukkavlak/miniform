@@ -13,6 +13,7 @@ export type SchemaType = 'string' | 'number' | 'boolean';
 export interface ISchemaDefinition {
   type: SchemaType;
   required?: boolean;
+  forceNew?: boolean; // If true, a change to this attribute forces replacement (Delete -> Create)
 }
 
 export type ISchema = Record<string, ISchemaDefinition>;
@@ -22,12 +23,15 @@ export interface IProvider {
   /** Resource types handled by this provider (e.g., ['custom_resource', 'another_type']) */
   readonly resources: string[];
 
+  /** Returns the schema for a specific resource type */
+  getSchema(type: string): Promise<ISchema>;
+
   /** Validates inputs against the resource schema. Throws validation error if invalid. */
   validate(type: string, inputs: Record<string, unknown>): Promise<void>;
 
   create(type: string, inputs: Record<string, unknown>): Promise<string>;
   update(id: string, type: string, inputs: Record<string, unknown>): Promise<void>;
-  delete(id: string): Promise<void>;
+  delete(id: string, type: string): Promise<void>;
 }
 
 /**
@@ -35,6 +39,11 @@ export interface IProvider {
  * Each resource type (e.g., local_file, aws_s3_bucket) implements this interface
  */
 export interface IResourceHandler {
+  /**
+   * Returns the schema for this resource
+   */
+  getSchema(): Promise<ISchema>;
+
   /**
    * Validate resource inputs before creation/update
    */

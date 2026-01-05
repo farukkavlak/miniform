@@ -3,16 +3,10 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "scripts": {
+    "build": "esbuild --sourcemap --bundle --platform=node --target=node18 --outfile=dist/index.js ./src/index.ts && tsc --emitDeclarationOnly --declaration --outDir dist src/index.ts --target ES2020 --moduleResolution node --esModuleInterop",
     "lint": "eslint .",
     "test": "vitest run --coverage",
     "type:check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@miniform/contracts": "*",
-    "@miniform/graph": "*",
-    "@miniform/parser": "*",
-    "@miniform/planner": "*",
-    "@miniform/state": "*"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^0.34.0",

@@ -64,11 +64,11 @@
 
 ### 4.2. Future Resources
 
-- [ ] **`random_string`:** Generate random strings (good for testing state persistence)
+- [x] **`random_string`:** Generate random strings (good for testing state persistence)
   - Inputs: `length`, `special` (bool)
-- [ ] **`null_resource`:** Do nothing (good for testing dependency chains)
+- [x] **`null_resource`:** Do nothing (good for testing dependency chains)
   - Inputs: `triggers` (map)
-- [ ] **`command_exec`:** Execute shell commands
+- [x] **`command_exec`:** Execute shell commands
   - Inputs: `command`, `cwd`
 
 ## 5. CLI Implementation
