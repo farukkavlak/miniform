@@ -53,12 +53,11 @@ export class Orchestrator {
     // 4. Generate execution plan
     // Fetch schemas for all resources in desired state
     const schemas: Record<string, ISchema> = {};
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Resource' && !schemas[stmt.resourceType]) {
         const schema = await this.getSchema(stmt.resourceType);
         if (schema) schemas[stmt.resourceType] = schema;
       }
-    }
 
     const allActions = plan(program, currentState, schemas);
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
