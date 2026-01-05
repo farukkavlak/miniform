@@ -1,4 +1,4 @@
-import { IProvider } from '@miniform/contracts';
+import { IProvider, ISchema } from '@miniform/contracts';
 import { StateManager } from '@miniform/state';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -11,6 +11,10 @@ import { Orchestrator } from '../src/index';
 class MockProvider implements IProvider {
   readonly resources = ['mock_resource'];
   private createdResources: Map<string, Record<string, unknown>> = new Map();
+
+  async getSchema(_type: string): Promise<ISchema> {
+    return {};
+  }
 
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing

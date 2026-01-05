@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
+// @ts-ignore
 import tsparser from '@typescript-eslint/parser';
 import type { Linter } from 'eslint';
 // @ts-ignore
