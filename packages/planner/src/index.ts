@@ -35,49 +35,6 @@ function calculateDiff(
   return hasChanges ? changes : null;
 }
 
-export function plan(desiredState: Program, currentState: IState, schemas: Record<string, ISchema> = {}): PlanAction[] {
-  const actions: PlanAction[] = [];
-  const currentMap = new Map<string, IResource>(Object.entries(currentState.resources));
-  const desiredMap = new Map<string, ResourceBlock>();
-
-  // Map desired resources for easier lookup
-  for (const stmt of desiredState)
-    if (stmt.type === 'Resource') {
-      const key = `${stmt.resourceType}.${stmt.name}`;
-      desiredMap.set(key, stmt);
-    }
-
-  // 1. Check for Create, Update, or Replace
-  for (const [key, resource] of desiredMap.entries()) {
-    const currentResource = currentMap.get(key);
-    if (currentResource) {
-      processExistingResource(actions, resource, currentResource, schemas);
-    } else {
-      actions.push({
-        type: 'CREATE',
-        resourceType: resource.resourceType,
-        name: resource.name,
-        attributes: resource.attributes,
-      });
-    }
-  }
-
-  // 2. Check for Delete (In state but not in desired)
-  for (const [key, resource] of currentMap.entries()) {
-    // If we already added a DELETE action for this key (due to replacement), skip.
-    const alreadyDeleting = actions.some((a) => a.type === 'DELETE' && a.resourceType === resource.resourceType && a.name === resource.name);
-    if (!desiredMap.has(key) && !alreadyDeleting)
-      actions.push({
-        type: 'DELETE',
-        resourceType: resource.resourceType,
-        name: resource.name,
-        id: resource.id,
-      });
-  }
-
-  return actions;
-}
-
 function processExistingResource(actions: PlanAction[], resource: ResourceBlock, currentResource: IResource, schemas: Record<string, ISchema>) {
   const changes = calculateDiff(currentResource.attributes as Record<string, AttributeValue>, resource.attributes);
 
@@ -94,7 +51,7 @@ function processExistingResource(actions: PlanAction[], resource: ResourceBlock,
   const schema = schemas[resource.resourceType] || {};
   const forcesNew = Object.keys(changes).some((attr) => schema[attr]?.forceNew);
 
-  if (forcesNew) {
+  if (forcesNew)
     actions.push(
       {
         type: 'DELETE',
@@ -109,7 +66,7 @@ function processExistingResource(actions: PlanAction[], resource: ResourceBlock,
         attributes: resource.attributes,
       }
     );
-  } else {
+  else
     actions.push({
       type: 'UPDATE',
       resourceType: resource.resourceType,
@@ -117,5 +74,45 @@ function processExistingResource(actions: PlanAction[], resource: ResourceBlock,
       id: currentResource.id,
       changes,
     });
+}
+
+export function plan(desiredState: Program, currentState: IState, schemas: Record<string, ISchema> = {}): PlanAction[] {
+  const actions: PlanAction[] = [];
+  const currentMap = new Map<string, IResource>(Object.entries(currentState.resources));
+  const desiredMap = new Map<string, ResourceBlock>();
+
+  // Map desired resources for easier lookup
+  for (const stmt of desiredState)
+    if (stmt.type === 'Resource') {
+      const key = `${stmt.resourceType}.${stmt.name}`;
+      desiredMap.set(key, stmt);
+    }
+
+  // 1. Check for Create, Update, or Replace
+  for (const [key, resource] of desiredMap.entries()) {
+    const currentResource = currentMap.get(key);
+    if (currentResource) processExistingResource(actions, resource, currentResource, schemas);
+    else
+      actions.push({
+        type: 'CREATE',
+        resourceType: resource.resourceType,
+        name: resource.name,
+        attributes: resource.attributes,
+      });
   }
+
+  // 2. Check for Delete (In state but not in desired)
+  for (const [key, resource] of currentMap.entries()) {
+    // If we already added a DELETE action for this key (due to replacement), skip.
+    const alreadyDeleting = actions.some((a) => a.type === 'DELETE' && a.resourceType === resource.resourceType && a.name === resource.name);
+    if (!desiredMap.has(key) && !alreadyDeleting)
+      actions.push({
+        type: 'DELETE',
+        resourceType: resource.resourceType,
+        name: resource.name,
+        id: resource.id,
+      });
+  }
+
+  return actions;
 }

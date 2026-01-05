@@ -10,7 +10,7 @@ export class RandomStringResource implements IResourceHandler {
   }
 
   async validate(inputs: Record<string, unknown>): Promise<void> {
-    if (!inputs.length || typeof inputs.length !== 'number' || inputs.length <= 0) throw new Error('random_string requires "length" attribute (number > 0)');
+    if (inputs.length === undefined || typeof inputs.length !== 'number' || inputs.length <= 0) throw new Error('random_string requires "length" attribute (number > 0)');
 
     if (inputs.special !== undefined && typeof inputs.special !== 'boolean') throw new Error('random_string "special" attribute must be a boolean');
   }
