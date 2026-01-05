@@ -147,6 +147,24 @@ describe('Orchestrator', () => {
         enabled: true,
       });
     });
+
+    it('should generate plan without applying (dry-run)', async () => {
+      const config = `
+        resource "mock_resource" "plan_test" {
+          name = "planned"
+        }
+      `;
+
+      const actions = await orchestrator.plan(config);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].type).toBe('CREATE');
+      expect(actions[0].resourceType).toBe('mock_resource');
+      expect(actions[0].name).toBe('plan_test');
+
+      // Verify no changes were made to provider
+      expect(mockProvider.getCreatedResources().size).toBe(0);
+    });
   });
 
   describe('UPDATE Operations', () => {

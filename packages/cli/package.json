@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@miniform/orchestrator": "*",
+    "@miniform/provider-local": "*",
     "@miniform/state": "*",
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
