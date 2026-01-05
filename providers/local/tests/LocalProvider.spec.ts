@@ -180,6 +180,14 @@ describe('LocalProvider', () => {
       const id = await provider.create('null_resource', {});
       expect(id).toMatch(/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i);
     });
+
+    it('should not update (no-op)', async () => {
+      await expect(provider.update('any-id', 'null_resource', {})).resolves.not.toThrow();
+    });
+
+    it('should not delete (no-op)', async () => {
+      await expect(provider.delete('any-id', 'null_resource')).resolves.not.toThrow();
+    });
   });
 
   describe('command_exec', () => {
@@ -201,6 +209,16 @@ describe('LocalProvider', () => {
     it('should fail if command fails', async () => {
       await expect(provider.create('command_exec', { command: 'exit 1' })).rejects.toThrow();
     });
+
+    it('should re-execute on update', async () => {
+      await expect(
+        provider.update('any-id', 'command_exec', { command: 'echo updated' })
+      ).resolves.not.toThrow();
+    });
+
+    it('should not delete (no-op)', async () => {
+      await expect(provider.delete('any-id', 'command_exec')).resolves.not.toThrow();
+    });
   });
 
   describe('delete (generic)', () => {
@@ -215,11 +233,31 @@ describe('LocalProvider', () => {
   });
 
   describe('getSchema', () => {
-    it('should return schema for supported resources', async () => {
+    it('should return schema for random_string', async () => {
       const schema = await provider.getSchema('random_string');
       expect(schema).toBeDefined();
       expect(schema.length).toBeDefined();
       expect(schema.length.forceNew).toBe(true);
+    });
+
+    it('should return schema for local_file', async () => {
+      const schema = await provider.getSchema('local_file');
+      expect(schema).toBeDefined();
+      expect(schema.path).toBeDefined();
+      expect(schema.path.forceNew).toBe(true);
+    });
+
+    it('should return schema for command_exec', async () => {
+      const schema = await provider.getSchema('command_exec');
+      expect(schema).toBeDefined();
+      expect(schema.command).toBeDefined();
+      expect(schema.command.forceNew).toBe(false);
+    });
+
+    it('should return schema for null_resource', async () => {
+      const schema = await provider.getSchema('null_resource');
+      expect(schema).toBeDefined();
+      expect(Object.keys(schema)).toHaveLength(0);
     });
 
     it('should throw for unknown types', async () => {
