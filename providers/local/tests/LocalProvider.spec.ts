@@ -130,7 +130,7 @@ describe('LocalProvider', () => {
       await expect(fs.access(filePath)).resolves.not.toThrow();
 
       // Delete
-      await provider.delete(filePath);
+      await provider.delete(filePath, 'local_file');
 
       // Verify it's gone
       await expect(fs.access(filePath)).rejects.toThrow();
@@ -140,6 +140,77 @@ describe('LocalProvider', () => {
   describe('Resources', () => {
     it('should expose local_file as supported resource', () => {
       expect(provider.resources).toContain('local_file');
+    });
+  });
+
+  describe('random_string', () => {
+    it('should validate length', async () => {
+      await expect(provider.validate('random_string', { length: 10 })).resolves.not.toThrow();
+      await expect(provider.validate('random_string', {})).rejects.toThrow();
+      await expect(provider.validate('random_string', { length: 0 })).rejects.toThrow();
+      await expect(provider.validate('random_string', { length: -5 })).rejects.toThrow();
+    });
+
+    it('should create a random string of specified length', async () => {
+      const id = await provider.create('random_string', { length: 16 });
+      expect(typeof id).toBe('string');
+      expect(id).toHaveLength(16);
+    });
+
+    it('should create a random string with special characters', async () => {
+      const id = await provider.create('random_string', { length: 50, special: true });
+      expect(id).toHaveLength(50);
+      const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      const hasSpecial = id.split('').some((char) => specialChars.includes(char));
+      expect(hasSpecial).toBe(true);
+    });
+
+    it('should not update (no-op)', async () => {
+      // Just ensure it doesn't throw
+      await expect(provider.update('any-id', 'random_string', { length: 10 })).resolves.not.toThrow();
+    });
+  });
+
+  describe('null_resource', () => {
+    it('should validate anything', async () => {
+      await expect(provider.validate('null_resource', { any: 'thing' })).resolves.not.toThrow();
+    });
+
+    it('should create and return a UUID', async () => {
+      const id = await provider.create('null_resource', {});
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+  });
+
+  describe('command_exec', () => {
+    it('should validate command', async () => {
+      await expect(provider.validate('command_exec', { command: 'echo hello' })).resolves.not.toThrow();
+      await expect(provider.validate('command_exec', {})).rejects.toThrow();
+    });
+
+    it('should execute a command', async () => {
+      const id = await provider.create('command_exec', { command: 'echo hello world' });
+      expect(id).toBeDefined();
+    });
+
+    it('should execute a command with cwd', async () => {
+      const id = await provider.create('command_exec', { command: 'pwd', cwd: '.' });
+      expect(id).toBeDefined();
+    });
+
+    it('should fail if command fails', async () => {
+      await expect(provider.create('command_exec', { command: 'exit 1' })).rejects.toThrow();
+    });
+  });
+
+  describe('delete (generic)', () => {
+    it('should not throw when deleting non-file resources', async () => {
+      // Pass correct type, should be no-op for random_string
+      await expect(provider.delete('some-random-id', 'random_string')).resolves.not.toThrow();
+    });
+
+    it('should throw for unknown types', async () => {
+      await expect(provider.delete('id', 'unknown_type')).rejects.toThrow('Unsupported resource type');
     });
   });
 });

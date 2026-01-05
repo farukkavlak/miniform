@@ -140,7 +140,7 @@ export class Orchestrator {
   private async executeDelete(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
     if (!action.id) throw new Error('DELETE action missing id');
 
-    await provider.delete(action.id);
+    await provider.delete(action.id, action.resourceType);
 
     delete currentState.resources[`${action.resourceType}.${action.name}`];
   }

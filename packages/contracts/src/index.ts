@@ -27,7 +27,7 @@ export interface IProvider {
 
   create(type: string, inputs: Record<string, unknown>): Promise<string>;
   update(id: string, type: string, inputs: Record<string, unknown>): Promise<void>;
-  delete(id: string): Promise<void>;
+  delete(id: string, type: string): Promise<void>;
 }
 
 /**

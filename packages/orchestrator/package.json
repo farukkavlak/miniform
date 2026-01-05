@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "scripts": {
+    "build": "tsc",
     "lint": "eslint .",
     "test": "vitest run --coverage",
     "type:check": "tsc --noEmit"
