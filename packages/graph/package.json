@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "esbuild --sourcemap --bundle --platform=node --target=node18 --packages=bundle --outfile=dist/index.js ./src/index.ts",
     "test": "vitest run --coverage",
     "type:check": "tsc --noEmit"
   },

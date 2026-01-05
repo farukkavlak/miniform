@@ -3,15 +3,10 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "esbuild --sourcemap --bundle --platform=node --target=node18 --packages=bundle --outfile=dist/index.js ./src/index.ts",
     "lint": "eslint .",
     "test": "vitest run --coverage",
     "type:check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@miniform/contracts": "*",
-    "@miniform/parser": "*",
-    "@miniform/state": "*"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^0.34.0",
