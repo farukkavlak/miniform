@@ -1,9 +1,9 @@
 import { IResourceHandler, ISchema } from '@miniform/contracts';
 import { exec } from 'node:child_process';
 import crypto from 'node:crypto';
-import util from 'node:util';
+import { promisify } from 'node:util';
 
-const execAsync = util.promisify(exec);
+const execAsync = promisify(exec);
 
 export class CommandExecResource implements IResourceHandler {
   async getSchema(): Promise<ISchema> {
@@ -14,9 +14,7 @@ export class CommandExecResource implements IResourceHandler {
   }
 
   async validate(inputs: Record<string, unknown>): Promise<void> {
-    if (!inputs.command || typeof inputs.command !== 'string') {
-      throw new Error('command_exec requires "command" attribute (string)');
-    }
+    if (!inputs.command || typeof inputs.command !== 'string') throw new Error('command_exec requires "command" attribute (string)');
   }
 
   async create(inputs: Record<string, unknown>): Promise<string> {
@@ -35,6 +33,7 @@ export class CommandExecResource implements IResourceHandler {
     await execAsync(command, { cwd });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async delete(_id: string): Promise<void> {
     // No-op
   }

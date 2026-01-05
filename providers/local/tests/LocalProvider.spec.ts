@@ -178,7 +178,7 @@ describe('LocalProvider', () => {
 
     it('should create and return a UUID', async () => {
       const id = await provider.create('null_resource', {});
-      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(id).toMatch(/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i);
     });
   });
 

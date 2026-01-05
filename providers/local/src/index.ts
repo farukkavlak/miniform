@@ -46,9 +46,7 @@ export class LocalProvider implements IProvider {
 
   async delete(id: string, type: string): Promise<void> {
     const handler = this.handlers.get(type);
-    if (!handler) {
-      throw new Error(`Unsupported resource type: ${type}`);
-    }
+    if (!handler) throw new Error(`Unsupported resource type: ${type}`);
 
     await handler.delete(id);
   }
