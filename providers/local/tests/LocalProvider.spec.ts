@@ -211,9 +211,7 @@ describe('LocalProvider', () => {
     });
 
     it('should re-execute on update', async () => {
-      await expect(
-        provider.update('any-id', 'command_exec', { command: 'echo updated' })
-      ).resolves.not.toThrow();
+      await expect(provider.update('any-id', 'command_exec', { command: 'echo updated' })).resolves.not.toThrow();
     });
 
     it('should not delete (no-op)', async () => {
