@@ -75,11 +75,11 @@
 
 **Requirement:** Command-line interface for user interaction.
 
-- [ ] **`@miniform/cli`:** User-facing commands
-  - [ ] `miniform init`: Workspace setup (create .miniform/, initialize state)
-  - [ ] `miniform plan`: Dry-run (show diffs without applying)
-  - [ ] `miniform apply`: Execute changes (calls Orchestrator.apply())
-  - [ ] Pretty output formatting (colored diffs, progress indicators)
+- [x] **`@miniform/cli`:** User-facing commands
+  - [x] `miniform init`: Workspace setup (create .miniform/, initialize state)
+  - [x] `miniform plan`: Dry-run (show diffs without applying)
+  - [x] `miniform apply`: Execute changes (calls Orchestrator.apply())
+  - [x] Pretty output formatting (colored diffs, progress indicators)
 
 ## 6. Future Scope: Scalable Provider Architecture
 

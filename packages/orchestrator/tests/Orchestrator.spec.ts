@@ -19,7 +19,6 @@ class MockProvider implements IProvider {
 
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing
-    console.log('Always valid for testing', _type, _inputs);
   }
 
   async create(_type: string, inputs: Record<string, unknown>): Promise<string> {
