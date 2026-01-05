@@ -1,4 +1,4 @@
-import { IProvider, IResourceHandler } from '@miniform/contracts';
+import { IProvider, IResourceHandler, ISchema } from '@miniform/contracts';
 
 import { CommandExecResource } from './resources/CommandExecResource';
 import { LocalFileResource } from './resources/LocalFileResource';
@@ -14,6 +14,13 @@ export class LocalProvider implements IProvider {
     this.handlers.set('random_string', new RandomStringResource());
     this.handlers.set('null_resource', new NullResource());
     this.handlers.set('command_exec', new CommandExecResource());
+  }
+
+  async getSchema(type: string): Promise<ISchema> {
+    const handler = this.handlers.get(type);
+    if (!handler) throw new Error(`Unsupported resource type: ${type}`);
+
+    return await handler.getSchema();
   }
 
   async validate(type: string, inputs: Record<string, unknown>): Promise<void> {

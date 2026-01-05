@@ -213,4 +213,17 @@ describe('LocalProvider', () => {
       await expect(provider.delete('id', 'unknown_type')).rejects.toThrow('Unsupported resource type');
     });
   });
+
+  describe('getSchema', () => {
+    it('should return schema for supported resources', async () => {
+      const schema = await provider.getSchema('random_string');
+      expect(schema).toBeDefined();
+      expect(schema.length).toBeDefined();
+      expect(schema.length.forceNew).toBe(true);
+    });
+
+    it('should throw for unknown types', async () => {
+      await expect(provider.getSchema('unknown_type')).rejects.toThrow('Unsupported resource type');
+    });
+  });
 });

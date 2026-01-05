@@ -1,7 +1,11 @@
-import { IResourceHandler } from '@miniform/contracts';
+import { IResourceHandler, ISchema } from '@miniform/contracts';
 import crypto from 'node:crypto';
 
 export class NullResource implements IResourceHandler {
+  async getSchema(): Promise<ISchema> {
+    return {};
+  }
+
   async validate(_inputs: Record<string, unknown>): Promise<void> {
     // Always valid
   }

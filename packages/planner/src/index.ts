@@ -1,4 +1,4 @@
-import { IResource } from '@miniform/contracts';
+import { IResource, ISchema } from '@miniform/contracts';
 import { AttributeValue, Program, ResourceBlock } from '@miniform/parser';
 import { IState } from '@miniform/state';
 
@@ -35,7 +35,7 @@ function calculateDiff(
   return hasChanges ? changes : null;
 }
 
-export function plan(desiredState: Program, currentState: IState): PlanAction[] {
+export function plan(desiredState: Program, currentState: IState, schemas: Record<string, ISchema> = {}): PlanAction[] {
   const actions: PlanAction[] = [];
   const currentMap = new Map<string, IResource>(Object.entries(currentState.resources));
   const desiredMap = new Map<string, ResourceBlock>();
@@ -47,29 +47,51 @@ export function plan(desiredState: Program, currentState: IState): PlanAction[] 
       desiredMap.set(key, stmt);
     }
 
-  // 1. Check for Create and Update
+  // 1. Check for Create, Update, or Replace
   for (const [key, resource] of desiredMap.entries()) {
     const currentResource = currentMap.get(key);
 
     if (currentResource) {
-      // CASE: UPDATE or NO_OP
+      // CASE: UPDATE, NO_OP, or REPLACE
       const changes = calculateDiff(currentResource.attributes as Record<string, AttributeValue>, resource.attributes);
 
-      if (changes)
-        actions.push({
-          type: 'UPDATE',
-          resourceType: resource.resourceType,
-          name: resource.name,
-          id: currentResource.id,
-          changes,
-        });
-      else
+      if (changes) {
+        // Check if any changed attribute forces replacement
+        const schema = schemas[resource.resourceType] || {};
+        const forcesNew = Object.keys(changes).some((attr) => schema[attr]?.forceNew);
+
+        if (forcesNew) {
+          // REPLACE: Delete then Create
+          actions.push({
+            type: 'DELETE',
+            resourceType: resource.resourceType,
+            name: resource.name,
+            id: currentResource.id,
+          });
+          actions.push({
+            type: 'CREATE',
+            resourceType: resource.resourceType,
+            name: resource.name,
+            attributes: resource.attributes,
+          });
+        } else {
+          // UPDATE
+          actions.push({
+            type: 'UPDATE',
+            resourceType: resource.resourceType,
+            name: resource.name,
+            id: currentResource.id,
+            changes,
+          });
+        }
+      } else {
         actions.push({
           type: 'NO_OP',
           resourceType: resource.resourceType,
           name: resource.name,
           id: currentResource.id,
         });
+      }
     } else
       // CASE: CREATE
       actions.push({
@@ -81,14 +103,17 @@ export function plan(desiredState: Program, currentState: IState): PlanAction[] 
   }
 
   // 2. Check for Delete (In state but not in desired)
-  for (const [key, resource] of currentMap.entries())
-    if (!desiredMap.has(key))
+  for (const [key, resource] of currentMap.entries()) {
+    // If we already added a DELETE action for this key (due to replacement), skip.
+    const alreadyDeletting = actions.some((a) => a.type === 'DELETE' && a.resourceType === resource.resourceType && a.name === resource.name);
+    if (!desiredMap.has(key) && !alreadyDeletting)
       actions.push({
         type: 'DELETE',
         resourceType: resource.resourceType,
         name: resource.name,
         id: resource.id,
       });
+  }
 
   return actions;
 }

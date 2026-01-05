@@ -1,4 +1,4 @@
-import { IProvider } from '@miniform/contracts';
+import { IProvider, ISchema } from '@miniform/contracts';
 import { Graph } from '@miniform/graph';
 import { Lexer, Parser } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
@@ -23,6 +23,13 @@ export class Orchestrator {
     }
   }
 
+  async getSchema(resourceType: string): Promise<ISchema | undefined> {
+    const provider = this.providers.get(resourceType);
+    if (!provider) return undefined;
+
+    return provider.getSchema(resourceType);
+  }
+
   /**
    * Execute a configuration file
    */
@@ -44,7 +51,20 @@ export class Orchestrator {
       }
 
     // 4. Generate execution plan
-    const allActions = plan(program, currentState);
+    // Fetch schemas for all resources in desired state
+    const schemas: Record<string, ISchema> = {};
+    for (const stmt of program) {
+      if (stmt.type === 'Resource') {
+        if (!schemas[stmt.resourceType]) {
+          const schema = await this.getSchema(stmt.resourceType);
+          if (schema) {
+            schemas[stmt.resourceType] = schema;
+          }
+        }
+      }
+    }
+
+    const allActions = plan(program, currentState, schemas);
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
 
     // 5. Execute plan in topological order (only CREATE/UPDATE)

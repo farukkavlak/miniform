@@ -1,7 +1,14 @@
-import { IResourceHandler } from '@miniform/contracts';
+import { IResourceHandler, ISchema } from '@miniform/contracts';
 import crypto from 'node:crypto';
 
 export class RandomStringResource implements IResourceHandler {
+  async getSchema(): Promise<ISchema> {
+    return {
+      length: { type: 'number', required: true, forceNew: true },
+      special: { type: 'boolean', required: false, forceNew: true },
+    };
+  }
+
   async validate(inputs: Record<string, unknown>): Promise<void> {
     if (!inputs.length || typeof inputs.length !== 'number' || inputs.length <= 0) {
       throw new Error('random_string requires "length" attribute (number > 0)');

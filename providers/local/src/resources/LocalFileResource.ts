@@ -1,8 +1,15 @@
-import { IResourceHandler } from '@miniform/contracts';
+import { IResourceHandler, ISchema } from '@miniform/contracts';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 export class LocalFileResource implements IResourceHandler {
+  async getSchema(): Promise<ISchema> {
+    return {
+      path: { type: 'string', required: true, forceNew: true }, // Changing path means new file
+      content: { type: 'string', required: true, forceNew: false }, // Changing content is update
+    };
+  }
+
   async validate(inputs: Record<string, unknown>): Promise<void> {
     if (!inputs.path || typeof inputs.path !== 'string') throw new Error('local_file requires "path" attribute (string)');
 

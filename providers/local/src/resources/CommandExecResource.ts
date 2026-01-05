@@ -1,4 +1,4 @@
-import { IResourceHandler } from '@miniform/contracts';
+import { IResourceHandler, ISchema } from '@miniform/contracts';
 import { exec } from 'node:child_process';
 import crypto from 'node:crypto';
 import util from 'node:util';
@@ -6,6 +6,13 @@ import util from 'node:util';
 const execAsync = util.promisify(exec);
 
 export class CommandExecResource implements IResourceHandler {
+  async getSchema(): Promise<ISchema> {
+    return {
+      command: { type: 'string', required: true, forceNew: false }, // Re-exec allows update
+      cwd: { type: 'string', required: false, forceNew: false },
+    };
+  }
+
   async validate(inputs: Record<string, unknown>): Promise<void> {
     if (!inputs.command || typeof inputs.command !== 'string') {
       throw new Error('command_exec requires "command" attribute (string)');
