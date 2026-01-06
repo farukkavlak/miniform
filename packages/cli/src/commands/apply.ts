@@ -31,7 +31,7 @@ export function createApplyCommand() {
         console.log(chalk.blue('Calculating plan...'));
         const actions = await orchestrator.plan(configContent);
 
-        if (actions.length === 0 || actions.every((a) => a.type === 'NO_OP')) {
+        if (actions.every((a) => a.type === 'NO_OP')) {
           console.log(chalk.green('No changes needed.'));
           return;
         }
