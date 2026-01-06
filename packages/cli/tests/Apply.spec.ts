@@ -26,8 +26,8 @@ describe('CLI: apply command', () => {
   it('should abort if validation fails (no config)', async () => {
     vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => { }) as never);
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await createApplyCommand().parseAsync(['node', 'miniform', 'apply']);
 
@@ -46,6 +46,7 @@ describe('CLI: apply command', () => {
       { type: 'CREATE', resourceType: 'test', name: 't1' },
       { type: 'UPDATE', resourceType: 'test', name: 't2' },
       { type: 'DELETE', resourceType: 'test', name: 't3' },
+      { type: 'NO_OP', resourceType: 'test', name: 't4' },
     ]);
     const applyMock = vi.fn().mockResolvedValue(void 0);
 
@@ -103,7 +104,7 @@ describe('CLI: apply command', () => {
     });
 
     vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: false });
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await createApplyCommand().parseAsync(['node', 'miniform', 'apply']);
 
@@ -126,7 +127,7 @@ describe('CLI: apply command', () => {
       } as Partial<Orchestrator> as Orchestrator;
     });
 
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await createApplyCommand().parseAsync(['node', 'miniform', 'apply']);
 
@@ -153,8 +154,8 @@ describe('CLI: apply command', () => {
 
     vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: true });
 
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => { }) as never);
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await createApplyCommand().parseAsync(['node', 'miniform', 'apply']);
 
@@ -181,7 +182,7 @@ describe('CLI: apply command', () => {
     });
 
     vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: true });
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await createApplyCommand().parseAsync(['node', 'miniform', 'apply']);
 

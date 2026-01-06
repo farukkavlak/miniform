@@ -62,7 +62,10 @@ describe('CLI: plan command', () => {
     vi.mocked(fs.access).mockResolvedValue(void 0);
     vi.mocked(fs.readFile).mockResolvedValue('resource "test" "t" {}');
 
-    const actions = [{ type: 'CREATE', resourceType: 'test', name: 't', attributes: {} }];
+    const actions = [
+      { type: 'CREATE', resourceType: 'test', name: 't', attributes: {} },
+      { type: 'NO_OP', resourceType: 'test', name: 't2' },
+    ];
     const planMock = vi.fn().mockResolvedValue(actions);
 
     vi.mocked(Orchestrator).mockImplementation(function () {
