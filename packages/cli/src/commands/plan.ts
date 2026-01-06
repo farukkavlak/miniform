@@ -19,7 +19,7 @@ export function createPlanCommand() {
     }
 
     try {
-      const configContent = await fs.readFile(configPath, 'utf-8');
+      const configContent = await fs.readFile(configPath, 'utf8');
 
       const orchestrator = new Orchestrator(cwd);
       orchestrator.registerProvider(new LocalProvider());

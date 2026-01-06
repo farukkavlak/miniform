@@ -37,7 +37,7 @@ describe('CLI: plan command', () => {
   });
 
   it('should display "No changes" when plan is empty', async () => {
-    vi.mocked(fs.access).mockResolvedValue(undefined);
+    vi.mocked(fs.access).mockResolvedValue(void 0);
     vi.mocked(fs.readFile).mockResolvedValue('');
 
     const planMock = vi.fn().mockResolvedValue([]);
@@ -59,7 +59,7 @@ describe('CLI: plan command', () => {
   });
 
   it('should display planned actions', async () => {
-    vi.mocked(fs.access).mockResolvedValue(undefined);
+    vi.mocked(fs.access).mockResolvedValue(void 0);
     vi.mocked(fs.readFile).mockResolvedValue('resource "test" "t" {}');
 
     const actions = [{ type: 'CREATE', resourceType: 'test', name: 't', attributes: {} }];

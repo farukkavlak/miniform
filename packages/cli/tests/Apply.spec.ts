@@ -39,11 +39,11 @@ describe('CLI: apply command', () => {
   });
 
   it('should apply changes when confirmed', async () => {
-    vi.mocked(fs.access).mockResolvedValue(undefined);
+    vi.mocked(fs.access).mockResolvedValue(void 0);
     vi.mocked(fs.readFile).mockResolvedValue('content');
 
     const planMock = vi.fn().mockResolvedValue([{ type: 'CREATE', resourceType: 'test', name: 't' }]);
-    const applyMock = vi.fn().mockResolvedValue(undefined);
+    const applyMock = vi.fn().mockResolvedValue(void 0);
 
     vi.mocked(Orchestrator).mockImplementation(function () {
       return {
@@ -63,11 +63,11 @@ describe('CLI: apply command', () => {
   });
 
   it('should skip confirmation with --yes flag', async () => {
-    vi.mocked(fs.access).mockResolvedValue(undefined);
+    vi.mocked(fs.access).mockResolvedValue(void 0);
     vi.mocked(fs.readFile).mockResolvedValue('content');
 
     const planMock = vi.fn().mockResolvedValue([{ type: 'CREATE', resourceType: 'test', name: 't' }]);
-    const applyMock = vi.fn().mockResolvedValue(undefined);
+    const applyMock = vi.fn().mockResolvedValue(void 0);
 
     vi.mocked(Orchestrator).mockImplementation(function () {
       return {
@@ -84,11 +84,11 @@ describe('CLI: apply command', () => {
   });
 
   it('should abort if confirmation declined', async () => {
-    vi.mocked(fs.access).mockResolvedValue(undefined);
+    vi.mocked(fs.access).mockResolvedValue(void 0);
     vi.mocked(fs.readFile).mockResolvedValue('content');
 
     const planMock = vi.fn().mockResolvedValue([{ type: 'CREATE', resourceType: 'test', name: 't' }]);
-    const applyMock = vi.fn().mockResolvedValue(undefined);
+    const applyMock = vi.fn().mockResolvedValue(void 0);
 
     vi.mocked(Orchestrator).mockImplementation(function () {
       return {

@@ -28,10 +28,10 @@ describe('CLI: init command', () => {
 
   it('should create .miniform directory and initialize state', async () => {
     // Mock fs.mkdir to succeed
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
 
     // Mock StateManager
-    const writeMock = vi.fn().mockResolvedValue(undefined);
+    const writeMock = vi.fn().mockResolvedValue(void 0);
     vi.mocked(StateManager).mockImplementation(function () {
       return {
         write: writeMock,
