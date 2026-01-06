@@ -7,5 +7,11 @@ export interface ResourceBlock {
   attributes: Record<string, AttributeValue>;
 }
 
-export type Statement = ResourceBlock;
+export interface VariableBlock {
+  type: 'Variable';
+  name: string; // e.g., "environment"
+  attributes: Record<string, AttributeValue>; // type, default, description
+}
+
+export type Statement = ResourceBlock | VariableBlock;
 export type Program = Statement[];

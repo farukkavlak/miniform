@@ -1,4 +1,4 @@
-import { AttributeValue, Program, ResourceBlock } from './ast';
+import { AttributeValue, Program, ResourceBlock, Statement, VariableBlock } from './ast';
 import { Token, TokenType } from './tokens';
 
 export class Parser {
@@ -15,11 +15,12 @@ export class Parser {
     return program;
   }
 
-  private statementParsers: Record<string, () => ResourceBlock> = {
+  private statementParsers: Record<string, () => Statement> = {
     [TokenType.Resource]: this.parseResource.bind(this),
+    [TokenType.Variable]: this.parseVariable.bind(this),
   };
 
-  private parseStatement(): ResourceBlock {
+  private parseStatement(): Statement {
     for (const [tokenType, handler] of Object.entries(this.statementParsers)) if (this.matchToken(tokenType as TokenType)) return handler();
     return this.error(`Unexpected token: ${this.peek().value}`);
   }
@@ -44,6 +45,29 @@ export class Parser {
     return {
       type: 'Resource',
       resourceType: typeToken.value,
+      name: nameToken.value,
+      attributes,
+    };
+  }
+
+  private parseVariable(): VariableBlock {
+    // variable "name" { ... }
+    const nameToken = this.consume(TokenType.String, "Expect variable name string after 'variable'.");
+
+    this.consume(TokenType.LBrace, "Expect '{' after variable name.");
+
+    const attributes: Record<string, AttributeValue> = {};
+    while (!this.check(TokenType.RBrace) && !this.isAtEnd()) {
+      const key = this.consume(TokenType.Identifier, 'Expect attribute name.').value;
+      this.consume(TokenType.Assign, "Expect '=' after attribute name.");
+      const value = this.parseValue();
+      attributes[key] = value;
+    }
+
+    this.consume(TokenType.RBrace, "Expect '}' after block body.");
+
+    return {
+      type: 'Variable',
       name: nameToken.value,
       attributes,
     };
