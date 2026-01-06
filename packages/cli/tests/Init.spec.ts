@@ -66,4 +66,20 @@ describe('CLI: init command', () => {
     exitSpy.mockRestore();
     consoleSpy.mockRestore();
   });
+
+  it('should handle non-Error exceptions', async () => {
+    // Mock fs.mkdir to throw a string
+    vi.mocked(fs.mkdir).mockRejectedValue('String error');
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await createInitCommand().parseAsync(['node', 'miniform', 'init']);
+
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to initialize workspace:', 'String error');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    exitSpy.mockRestore();
+    consoleSpy.mockRestore();
+  });
 });
