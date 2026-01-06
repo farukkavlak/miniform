@@ -1,10 +1,70 @@
 import { Orchestrator } from '@miniform/orchestrator';
+import { PlanAction } from '@miniform/planner';
 import { LocalProvider } from '@miniform/provider-local';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+
+function getActionSymbol(actionType: string): string {
+  if (actionType === 'CREATE') return chalk.green('+');
+  if (actionType === 'UPDATE') return chalk.yellow('~');
+  if (actionType === 'DELETE') return chalk.red('-');
+  return ' ';
+}
+
+function displayActions(actions: PlanAction[]): void {
+  console.log(chalk.bold('\nMiniform will perform the following actions:\n'));
+  for (const action of actions) {
+    if (action.type === 'NO_OP') continue;
+    const symbol = getActionSymbol(action.type);
+    console.log(`  ${symbol} ${action.resourceType}.${action.name}`);
+  }
+}
+
+async function confirmApply(autoConfirm: boolean): Promise<boolean> {
+  if (autoConfirm) return true;
+
+  const { confirm } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: 'Do you want to perform these actions?',
+      default: false,
+    },
+  ]);
+
+  return confirm;
+}
+
+async function executeApply(cwd: string, configPath: string, autoConfirm: boolean): Promise<void> {
+  const configContent = await fs.readFile(configPath, 'utf8');
+
+  const orchestrator = new Orchestrator(cwd);
+  orchestrator.registerProvider(new LocalProvider());
+
+  // Show plan first
+  console.log(chalk.blue('Calculating plan...'));
+  const actions = await orchestrator.plan(configContent);
+
+  if (actions.every((a) => a.type === 'NO_OP')) {
+    console.log(chalk.green('No changes needed.'));
+    return;
+  }
+
+  displayActions(actions);
+
+  const confirmed = await confirmApply(autoConfirm);
+  if (!confirmed) {
+    console.log(chalk.yellow('Apply cancelled.'));
+    return;
+  }
+
+  console.log(chalk.blue('\napplying...'));
+  await orchestrator.apply(configContent);
+  console.log(chalk.green('\nApply complete! Resources: ' + actions.length + ' processed.'));
+}
 
 export function createApplyCommand() {
   return new Command('apply')
@@ -22,47 +82,7 @@ export function createApplyCommand() {
       }
 
       try {
-        const configContent = await fs.readFile(configPath, 'utf8');
-
-        const orchestrator = new Orchestrator(cwd);
-        orchestrator.registerProvider(new LocalProvider());
-
-        // Show plan first
-        console.log(chalk.blue('Calculating plan...'));
-        const actions = await orchestrator.plan(configContent);
-
-        if (actions.every((a) => a.type === 'NO_OP')) {
-          console.log(chalk.green('No changes needed.'));
-          return;
-        }
-
-        // Re-use plan logic to show output (duplicated for now, could be shared)
-        console.log(chalk.bold('\nMiniform will perform the following actions:\n'));
-        for (const action of actions) {
-          if (action.type === 'NO_OP') continue;
-          const symbol = action.type === 'CREATE' ? chalk.green('+') : action.type === 'UPDATE' ? chalk.yellow('~') : action.type === 'DELETE' ? chalk.red('-') : ' ';
-          console.log(`  ${symbol} ${action.resourceType}.${action.name}`);
-        }
-
-        if (!options.yes) {
-          const { confirm } = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'confirm',
-              message: 'Do you want to perform these actions?',
-              default: false,
-            },
-          ]);
-
-          if (!confirm) {
-            console.log(chalk.yellow('Apply cancelled.'));
-            return;
-          }
-        }
-
-        console.log(chalk.blue('\napplying...'));
-        await orchestrator.apply(configContent);
-        console.log(chalk.green('\nApply complete! Resources: ' + actions.length + ' processed.'));
+        await executeApply(cwd, configPath, options.yes);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(chalk.red('Apply failed:'), message);
