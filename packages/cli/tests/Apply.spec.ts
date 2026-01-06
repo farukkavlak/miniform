@@ -26,7 +26,7 @@ describe('CLI: apply command', () => {
   it('should abort if validation fails (no config)', async () => {
     vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await createApplyCommand().parseAsync(['node', 'miniform', 'apply']);
@@ -50,7 +50,7 @@ describe('CLI: apply command', () => {
         registerProvider: vi.fn(),
         plan: planMock,
         apply: applyMock,
-      } as any;
+      } as Partial<Orchestrator> as Orchestrator;
     });
 
     vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: true });
@@ -74,7 +74,7 @@ describe('CLI: apply command', () => {
         registerProvider: vi.fn(),
         plan: planMock,
         apply: applyMock,
-      } as any;
+      } as Partial<Orchestrator> as Orchestrator;
     });
 
     await createApplyCommand().parseAsync(['node', 'miniform', 'apply', '--yes']);
@@ -95,7 +95,7 @@ describe('CLI: apply command', () => {
         registerProvider: vi.fn(),
         plan: planMock,
         apply: applyMock,
-      } as any;
+      } as Partial<Orchestrator> as Orchestrator;
     });
 
     vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: false });

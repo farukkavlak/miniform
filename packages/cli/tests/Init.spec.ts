@@ -38,7 +38,7 @@ describe('CLI: init command', () => {
         read: vi.fn(),
         lock: vi.fn(),
         unlock: vi.fn(),
-      } as any;
+      } as Partial<StateManager> as StateManager;
     });
 
     // Execute command action directly (commander action handler)
@@ -55,7 +55,7 @@ describe('CLI: init command', () => {
     vi.mocked(fs.mkdir).mockRejectedValue(error);
 
     // Mock process.exit to prevent test exit
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await createInitCommand().parseAsync(['node', 'miniform', 'init']);

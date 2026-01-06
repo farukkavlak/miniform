@@ -54,8 +54,9 @@ export function createPlanCommand() {
       const deleteCount = actions.filter((a) => a.type === 'DELETE').length;
 
       console.log(chalk.bold(`\nPlan: ${createCount} to add, ${updateCount} to change, ${deleteCount} to destroy.`));
-    } catch (error: any) {
-      console.error(chalk.red('Planning failed:'), error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red('Planning failed:'), message);
       process.exit(1);
     }
   });

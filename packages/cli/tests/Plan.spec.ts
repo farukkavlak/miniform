@@ -24,7 +24,7 @@ describe('CLI: plan command', () => {
   it('should fail if main.mini does not exist', async () => {
     vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await createPlanCommand().parseAsync(['node', 'miniform', 'plan']);
@@ -45,7 +45,7 @@ describe('CLI: plan command', () => {
       return {
         registerProvider: vi.fn(),
         plan: planMock,
-      } as any;
+      } as Partial<Orchestrator> as Orchestrator;
     });
 
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -69,7 +69,7 @@ describe('CLI: plan command', () => {
       return {
         registerProvider: vi.fn(),
         plan: planMock,
-      } as any;
+      } as Partial<Orchestrator> as Orchestrator;
     });
 
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

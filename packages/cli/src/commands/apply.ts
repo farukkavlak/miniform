@@ -63,8 +63,9 @@ export function createApplyCommand() {
         console.log(chalk.blue('\napplying...'));
         await orchestrator.apply(configContent);
         console.log(chalk.green('\nApply complete! Resources: ' + actions.length + ' processed.'));
-      } catch (error: any) {
-        console.error(chalk.red('Apply failed:'), error.message);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(chalk.red('Apply failed:'), message);
         process.exit(1);
       }
     });

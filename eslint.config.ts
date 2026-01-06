@@ -200,7 +200,7 @@ export default [
       'unicorn/no-new-buffer': 'warn',
       'unicorn/no-null': 'off',
       'unicorn/no-object-as-default-parameter': 'warn',
-      'unicorn/no-process-exit': 'warn',
+      'unicorn/no-process-exit': 'off',
       'unicorn/no-single-promise-in-promise-methods': 'warn',
       'unicorn/no-static-only-class': 'warn',
       'unicorn/no-thenable': 'warn',

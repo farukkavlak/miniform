@@ -23,8 +23,9 @@ export function createInitCommand() {
       console.log(chalk.green(`✓ Initialized state.json`));
 
       console.log(chalk.bold.green('\nMiniform initialized successfully! 🚀'));
-    } catch (error: any) {
-      console.error(chalk.red('Failed to initialize workspace:'), error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red('Failed to initialize workspace:'), message);
       process.exit(1);
     }
   });
