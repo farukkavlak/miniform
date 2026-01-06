@@ -31,9 +31,9 @@ export class Orchestrator {
   }
 
   /**
-   * Execute a configuration file
+   * Generate an execution plan without applying it
    */
-  async apply(configContent: string): Promise<void> {
+  async plan(configContent: string): Promise<PlanAction[]> {
     // 1. Parse config
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
@@ -42,15 +42,7 @@ export class Orchestrator {
     // 2. Load current state
     const currentState = await this.stateManager.read();
 
-    // 3. Build dependency graph (no data needed, just topology)
-    const graph = new Graph<null>();
-    for (const stmt of program)
-      if (stmt.type === 'Resource') {
-        const key = `${stmt.resourceType}.${stmt.name}`;
-        graph.addNode(key, null);
-      }
-
-    // 4. Generate execution plan
+    // 3. Generate execution plan
     // Fetch schemas for all resources in desired state
     const schemas: Record<string, ISchema> = {};
     for (const stmt of program)
@@ -59,7 +51,32 @@ export class Orchestrator {
         if (schema) schemas[stmt.resourceType] = schema;
       }
 
-    const allActions = plan(program, currentState, schemas);
+    return plan(program, currentState, schemas);
+  }
+
+  /**
+   * Execute a configuration file
+   */
+  async apply(configContent: string): Promise<void> {
+    // 1. Generate plan
+    const allActions = await this.plan(configContent);
+
+    // 2. Load current state (needed for graph building and execution)
+    const currentState = await this.stateManager.read();
+
+    // 3. Parse config again to build graph (optimized to reuse parse result in future, but keeping simple for now)
+    const lexer = new Lexer(configContent);
+    const parser = new Parser(lexer.tokenize());
+    const program = parser.parse();
+
+    // 4. Build dependency graph
+    const graph = new Graph<null>();
+    for (const stmt of program)
+      if (stmt.type === 'Resource') {
+        const key = `${stmt.resourceType}.${stmt.name}`;
+        graph.addNode(key, null);
+      }
+
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
 
     // 5. Execute plan in topological order (only CREATE/UPDATE)

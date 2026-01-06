@@ -17,9 +17,9 @@ class MockProvider implements IProvider {
     return {};
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing
-    console.log('Always valid for testing', _type, _inputs);
   }
 
   async create(_type: string, inputs: Record<string, unknown>): Promise<string> {
@@ -146,6 +146,24 @@ describe('Orchestrator', () => {
         count: 42,
         enabled: true,
       });
+    });
+
+    it('should generate plan without applying (dry-run)', async () => {
+      const config = `
+        resource "mock_resource" "plan_test" {
+          name = "planned"
+        }
+      `;
+
+      const actions = await orchestrator.plan(config);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].type).toBe('CREATE');
+      expect(actions[0].resourceType).toBe('mock_resource');
+      expect(actions[0].name).toBe('plan_test');
+
+      // Verify no changes were made to provider
+      expect(mockProvider.getCreatedResources().size).toBe(0);
     });
   });
 
