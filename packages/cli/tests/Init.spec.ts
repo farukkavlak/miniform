@@ -1,5 +1,4 @@
 import { StateManager } from '@miniform/state';
-import chalk from 'chalk';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

@@ -17,6 +17,7 @@ class MockProvider implements IProvider {
     return {};
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing
   }

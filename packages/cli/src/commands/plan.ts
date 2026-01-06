@@ -45,11 +45,8 @@ export function createPlanCommand() {
 
         console.log(`  ${symbol} ${action.resourceType}.${action.name} will be ${typeColor}d`);
 
-        if (action.type === 'UPDATE' && action.changes) {
-          for (const [key, change] of Object.entries(action.changes)) {
-            console.log(`      ${key}: ${JSON.stringify(change.old)} -> ${JSON.stringify(change.new)}`);
-          }
-        }
+        if (action.type === 'UPDATE' && action.changes)
+          for (const [key, change] of Object.entries(action.changes)) console.log(`      ${key}: ${JSON.stringify(change.old)} -> ${JSON.stringify(change.new)}`);
       }
 
       const createCount = actions.filter((a) => a.type === 'CREATE').length;
