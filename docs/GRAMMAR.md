@@ -39,12 +39,26 @@ resource "local_file" "config" {
 }
 ```
 
-**Fields:**
+### Variable Block
 
-- `resource` - Keyword
-- `"local_file"` - Resource type (string)
-- `"config"` - Resource name (string)
-- `{ ... }` - Attribute block
+```hcl
+variable "environment" {
+  type = "string"
+  default = "dev"
+}
+```
+
+### Output Block
+
+```hcl
+output "file_path" {
+  value = local_file.config.path
+}
+
+output "greeting" {
+  value = "Hello ${var.environment}!"
+}
+```
 
 ## 4. Value Types
 
@@ -58,6 +72,12 @@ resource "local_file" "config" {
 
 - **Variable:** `var.region`
 - **Resource:** `local_file.config.path`
+
+### String Interpolation
+
+```hcl
+content = "Hello ${var.name}! Version: ${var.version}"
+```
 
 **Reference Format:**
 
@@ -75,19 +95,30 @@ Examples:
 ```typescript
 type Program = Statement[];
 
-type Statement = ResourceStatement;
+type Statement = ResourceBlock | VariableBlock | OutputBlock;
 
-interface ResourceStatement {
+interface ResourceBlock {
   type: 'Resource';
   resourceType: string;
   name: string;
   attributes: Record<string, AttributeValue>;
 }
 
+interface VariableBlock {
+  type: 'Variable';
+  name: string;
+  attributes: Record<string, AttributeValue>;
+}
+
+interface OutputBlock {
+  type: 'Output';
+  name: string;
+  value: AttributeValue;
+}
+
 interface AttributeValue {
   type: 'String' | 'Number' | 'Boolean' | 'Reference';
-  value: string | number | boolean;
-  path?: string[]; // For references: ['local_file', 'config', 'path']
+  value: string | number | boolean | string[];
 }
 ```
 

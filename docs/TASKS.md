@@ -104,6 +104,7 @@
 - [x] **String Interpolation:** `${var.x}` support (requires Lexer templates).
 - [x] **Variable Blocks:** `variable "env" { default = "dev" }` parsing.
 - [x] **Reference Resolution:** Planner logic to resolve `Reference` nodes to values.
+- [x] **Output Blocks:** `output "name" { value = ... }` for displaying values after apply.
 
 ---
 
