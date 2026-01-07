@@ -264,5 +264,54 @@ describe('Miniform Parser', () => {
       // "Unexpected token at line 1, column 1: "@""
       expect(() => makeParser(input)).toThrow('Unexpected token at line 1, column 1: "@"');
     });
+
+    it('should throw on invalid reference (missing property after dot)', () => {
+      const input = `resource "type" "name" { ref = foo. }`;
+      const parser = makeParser(input);
+      expect(() => parser.parse()).toThrow('Expect property name after dot');
+    });
+  });
+
+  describe('Output Blocks', () => {
+    it('should parse output block with string value', () => {
+      const input = `
+        output "my_output" {
+          value = "test_value"
+        }
+      `;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        type: 'Output',
+        name: 'my_output',
+        value: { type: 'String', value: 'test_value' },
+      });
+    });
+
+    it('should parse output block with number value', () => {
+      const input = `output "count" { value = 42 }`;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result[0]).toMatchObject({
+        type: 'Output',
+        name: 'count',
+        value: { type: 'Number', value: 42 },
+      });
+    });
+
+    it('should parse output block with reference value', () => {
+      const input = `output "ref_output" { value = my_resource.name.attr }`;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result[0]).toMatchObject({
+        type: 'Output',
+        name: 'ref_output',
+        value: { type: 'Reference', value: ['my_resource', 'name', 'attr'] },
+      });
+    });
   });
 });
