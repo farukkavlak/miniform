@@ -125,7 +125,7 @@ export class Parser {
     if (this.matchToken(TokenType.Boolean)) return { type: 'Boolean', value: this.previous().value === 'true' };
 
     // Reference Parsing: identifier.key.subkey
-    if (this.check(TokenType.Identifier)) {
+    if (this.check(TokenType.Identifier) || this.check(TokenType.Data)) {
       const parts: string[] = [];
 
       // First part
@@ -133,8 +133,11 @@ export class Parser {
 
       // Subsequent parts (dot separated)
       while (this.matchToken(TokenType.Dot)) {
-        const part = this.consume(TokenType.Identifier, 'Expect property name after dot.');
-        parts.push(part.value);
+        if (this.check(TokenType.Identifier) || this.check(TokenType.Data) || this.check(TokenType.Variable) || this.check(TokenType.Resource) || this.check(TokenType.Output)) {
+          parts.push(this.advance().value);
+        } else {
+          return this.error('Expect property name after dot.');
+        }
       }
 
       return { type: 'Reference', value: parts };

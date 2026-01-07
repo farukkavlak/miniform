@@ -7,6 +7,7 @@ import { IState, StateManager } from '@miniform/state';
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
   private variables: Map<string, unknown> = new Map();
+  private dataSources: Map<string, Record<string, unknown>> = new Map();
   private stateManager: StateManager;
 
   constructor(workingDir?: string) {
@@ -36,11 +37,35 @@ export class Orchestrator {
    */
   private processVariables(program: ReturnType<Parser['parse']>): void {
     this.variables.clear();
-    for (const stmt of program)
+    for (const stmt of program) {
       if (stmt.type === 'Variable') {
         const defaultValue = stmt.attributes.default?.value;
         this.variables.set(stmt.name, defaultValue);
       }
+    }
+  }
+
+  private async processDataSources(program: ReturnType<Parser['parse']>, state: IState): Promise<void> {
+    this.dataSources.clear();
+
+    for (const stmt of program) {
+      if (stmt.type === 'Data') {
+        const provider = this.providers.get(stmt.dataSourceType);
+        if (!provider) throw new Error(`Provider for data source type "${stmt.dataSourceType}" not registered`);
+
+        // Resolve inputs (attributes)
+        const inputs = this.convertAttributes(stmt.attributes, state);
+
+        // Validate inputs
+        await provider.validate(stmt.dataSourceType, inputs);
+
+        // Read data
+        const resolvedAttributes = await provider.read(stmt.dataSourceType, inputs);
+
+        // Store in dataSources map
+        this.dataSources.set(`${stmt.dataSourceType}.${stmt.name}`, resolvedAttributes);
+      }
+    }
   }
 
   /**
@@ -58,14 +83,18 @@ export class Orchestrator {
     // 3. Load current state
     const currentState = await this.stateManager.read();
 
-    // 4. Generate execution plan
+    // 4. Process Data Sources (Resolve them before planning)
+    await this.processDataSources(program, currentState);
+
+    // 5. Generate execution plan
     // Fetch schemas for all resources in desired state
     const schemas: Record<string, ISchema> = {};
-    for (const stmt of program)
+    for (const stmt of program) {
       if (stmt.type === 'Resource' && !schemas[stmt.resourceType]) {
         const schema = await this.getSchema(stmt.resourceType);
         if (schema) schemas[stmt.resourceType] = schema;
       }
+    }
 
     return plan(program, currentState, schemas);
   }
@@ -80,21 +109,26 @@ export class Orchestrator {
     // 2. Load current state (needed for graph building and execution)
     const currentState = await this.stateManager.read();
 
-    // 3. Parse config again to build graph (optimized to reuse parse result in future, but keeping simple for now)
+    // 3. Parse config again to build graph
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
     const program = parser.parse();
 
     // 4. Build dependency graph with edges from resource references
     const graph = new Graph<null>();
-    for (const stmt of program)
+    for (const stmt of program) {
       if (stmt.type === 'Resource') {
         const key = `${stmt.resourceType}.${stmt.name}`;
         graph.addNode(key, null);
       }
+    }
 
     // Add edges for resource references (dependencies)
-    for (const stmt of program) if (stmt.type === 'Resource') this.addResourceDependencies(stmt, graph);
+    for (const stmt of program) {
+      if (stmt.type === 'Resource') {
+        this.addResourceDependencies(stmt, graph);
+      }
+    }
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
 
@@ -103,7 +137,9 @@ export class Orchestrator {
 
     // 6. Execute DELETE actions (not in graph since they're not in desired state)
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
-    for (const action of deleteActions) await this.executeAction(action, currentState);
+    for (const action of deleteActions) {
+      await this.executeAction(action, currentState);
+    }
 
     // 7. Add variables to state
     currentState.variables = Object.fromEntries(this.variables);
@@ -117,11 +153,12 @@ export class Orchestrator {
 
   private processOutputs(program: ReturnType<Parser['parse']>, state: IState): Record<string, unknown> {
     const outputs: Record<string, unknown> = {};
-    for (const stmt of program)
+    for (const stmt of program) {
       if (stmt.type === 'Output') {
         const resolved = this.resolveValue(stmt.value, state);
         outputs[stmt.name] = resolved;
       }
+    }
     return outputs;
   }
 
@@ -133,17 +170,18 @@ export class Orchestrator {
 
   private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>): void {
     const key = `${stmt.resourceType}.${stmt.name}`;
-    for (const attr of Object.values(stmt.attributes))
+    for (const attr of Object.values(stmt.attributes)) {
       if (attr.type === 'Reference' && attr.value[0] !== 'var') {
         const depKey = `${attr.value[0]}.${attr.value[1]}`;
         if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
       }
+    }
   }
 
   private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState): Promise<void> {
     const layers = graph.topologicalSort();
 
-    for (const layer of layers)
+    for (const layer of layers) {
       // Execute all actions in this layer in parallel
       await Promise.all(
         layer.map(async (resourceKey: string) => {
@@ -153,6 +191,7 @@ export class Orchestrator {
           await this.executeAction(action, currentState);
         })
       );
+    }
   }
 
   private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
@@ -176,7 +215,6 @@ export class Orchestrator {
       }
 
       case 'NO_OP': {
-        // Do nothing
         break;
       }
 
@@ -200,7 +238,7 @@ export class Orchestrator {
       type: 'Resource',
       resourceType: action.resourceType,
       name: action.name,
-      attributes: action.attributes,
+      attributes: inputs, // Store resolved inputs, not method attributes with placeholders
     };
   }
 
@@ -211,13 +249,16 @@ export class Orchestrator {
     const currentResource = currentState.resources[`${action.resourceType}.${action.name}`];
     const newAttributes = { ...currentResource.attributes };
 
-    for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
+    for (const [key, change] of Object.entries(action.changes)) {
+      if (change.new !== undefined) newAttributes[key] = change.new;
+    }
 
     const inputs = this.convertAttributes(newAttributes, currentState);
+
     await provider.validate(action.resourceType, inputs);
     await provider.update(action.id, action.resourceType, inputs);
 
-    currentResource.attributes = newAttributes;
+    currentResource.attributes = inputs; // Update state with resolved values
   }
 
   private async executeDelete(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
@@ -231,14 +272,17 @@ export class Orchestrator {
   private convertAttributes(attributes: Record<string, unknown>, state: IState): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(attributes))
+    for (const [key, value] of Object.entries(attributes)) {
       // AttributeValue has { type, value } structure
       if (value && typeof value === 'object' && 'type' in value) {
         const attrValue = value as { type: string; value: unknown };
         if (attrValue.type === 'Reference') result[key] = this.resolveReference(attrValue.value as string[], state);
         else if (attrValue.type === 'String') result[key] = this.interpolateString(attrValue.value as string, state);
         else result[key] = attrValue.value;
-      } else result[key] = value;
+      } else {
+        result[key] = value;
+      }
+    }
 
     return result;
   }
@@ -268,6 +312,23 @@ export class Orchestrator {
       return this.variables.get(varName);
     }
 
+    // Data Source reference: data.type.name.attribute
+    if (path[0] === 'data') {
+      if (path.length < 4) throw new Error(`Data source reference must include attribute: ${path.join('.')}`);
+
+      const dataSourceKey = `${path[1]}.${path[2]}`;
+      const dataAttributes = this.dataSources.get(dataSourceKey);
+
+      if (!dataAttributes) throw new Error(`Data source "${dataSourceKey}" not found (or not resolved yet)`);
+
+      const attrName = path[3];
+      const attrValue = dataAttributes[attrName];
+
+      if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on data source "${dataSourceKey}"`);
+
+      return attrValue;
+    }
+
     // Resource reference: type.name.attribute
     if (path.length < 3) throw new Error(`Resource reference must include attribute: ${path.join('.')}`);
 
@@ -279,7 +340,10 @@ export class Orchestrator {
     const attrValue = resource.attributes[attrName];
     if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on resource "${resourceKey}"`);
 
-    if (attrValue && typeof attrValue === 'object' && 'value' in attrValue) return attrValue.value;
+    if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) {
+      return (attrValue as { value: unknown }).value;
+    }
+
     return attrValue;
   }
 }
