@@ -52,6 +52,7 @@ describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
       getSchema: vi.fn().mockReturnValue({}),
     };
     // Mock classes are already imported via vi.mock
+    // eslint-disable-next-line unicorn/prefer-module
     const { StateManager, LocalBackend } = require('@miniform/state');
     const backend = new LocalBackend();
     const stateManager = new StateManager(backend);
