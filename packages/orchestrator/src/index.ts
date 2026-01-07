@@ -1,6 +1,6 @@
 import { IProvider, ISchema } from '@miniform/contracts';
 import { Graph } from '@miniform/graph';
-import { Lexer, Parser, ResourceBlock, Statement } from '@miniform/parser';
+import { AttributeValue, Lexer, Parser, ResourceBlock, Statement } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
 import * as fs from 'node:fs';
@@ -124,48 +124,7 @@ export class Orchestrator {
           block: stmt,
         });
       } else if (stmt.type === 'Module') {
-        // Handle child module
-        const moduleName = stmt.name;
-        const rawAttributes = stmt.attributes || [];
-        const attributesMap: Record<string, unknown> = {};
-
-        if (Array.isArray(rawAttributes)) for (const a of rawAttributes) attributesMap[a.name] = a;
-        else Object.assign(attributesMap, rawAttributes);
-
-        const sourceAttr = attributesMap.source as { value: unknown } | undefined;
-        const sourceValue = sourceAttr?.value;
-
-        if (typeof sourceValue !== 'string') throw new Error(`Module "${moduleName}" is missing a valid "source" attribute.`);
-
-        const sourcePath = sourceValue;
-        const moduleDir = path.resolve(rootDir, sourcePath);
-        const moduleFile = path.join(moduleDir, 'main.mf');
-
-        if (!fs.existsSync(moduleFile)) throw new Error(`Module source not found at: ${moduleFile}`);
-
-        const moduleContent = fs.readFileSync(moduleFile, 'utf8');
-        const lexer = new Lexer(moduleContent);
-        const parser = new Parser(lexer.tokenize());
-        const moduleProgram = parser.parse() || [];
-
-        // Prepare child scope
-        const childAddress = new Address([...parentAddress.modulePath, moduleName], '', '');
-        const childScopeKey = this.getAddressScope(childAddress);
-
-        // Pass inputs to child scope variables
-        if (!this.variables.has(childScopeKey)) this.variables.set(childScopeKey, new Map());
-        const childVars = this.variables.get(childScopeKey)!;
-
-        // Process module attributes as inputs
-        for (const [key, attr] of Object.entries(attributesMap)) {
-          if (key === 'source') continue;
-          childVars.set(key, {
-            value: attr,
-            context: parentAddress, // Defined in PARENT scope
-          });
-        }
-
-        const { resources: subResources } = await this.loadModuleTree(Array.isArray(moduleProgram) ? Array.from(moduleProgram) : [], moduleDir, childAddress, moduleAccumulator);
+        const subResources = await this.loadChildModule(stmt, rootDir, parentAddress, moduleAccumulator);
         resources.push(...subResources);
       }
 
@@ -223,39 +182,15 @@ export class Orchestrator {
     this.dataSources.clear();
     for (const mod of loadedModules) await this.processDataSources(mod.program, currentState, mod.address);
 
-    const graph = new Graph<null>();
-    for (const { uniqueId } of loadedResources) graph.addNode(uniqueId, null);
-
-    // Add output nodes to the graph
-    for (const mod of loadedModules) {
-      const scope = this.getAddressScope(mod.address);
-      for (const stmt of mod.program)
-        if (stmt.type === 'Output') {
-          const outputKey = scope ? `${scope}.outputs.${stmt.name}` : `outputs.${stmt.name}`;
-          graph.addNode(outputKey, null);
-
-          // Track dependencies for this output (any resource it refers to)
-          this.addValueDependencies(stmt.value, graph, outputKey, mod.address);
-        }
-    }
-
-    // Add edges for resource references
-    for (const { address, block } of loadedResources) this.addResourceDependencies(block, graph, address);
+    const graph = this.buildExecutionGraph(loadedResources, loadedModules);
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
-    await this.executePlan(createUpdateActions, graph, currentState, loadedModules);
+    await this.executeActionsSequentially(createUpdateActions, graph, currentState, loadedModules);
 
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
     for (const action of deleteActions) await this.executeAction(action, currentState);
 
-    if (!currentState.variables) currentState.variables = {};
-    const varsObj: Record<string, Record<string, unknown>> = {};
-    for (const [scope, varMap] of this.variables.entries()) {
-      const simpleVarMap: Record<string, unknown> = {};
-      for (const [k, v] of varMap.entries()) simpleVarMap[k] = v.value;
-      varsObj[scope] = simpleVarMap;
-    }
-    currentState.variables = varsObj;
+    this.syncStateVariables(currentState);
 
     await this.stateManager.write(currentState);
 
@@ -304,58 +239,89 @@ export class Orchestrator {
     if (!value || typeof value !== 'object') return;
 
     const typedValue = value as { type: string; value: unknown };
-    if (typedValue.type === 'Reference') {
-      const refParts = typedValue.value as string[];
-      if (refParts[0] === 'var') {
-        const scope = this.getAddressScope(context);
-        const variable = this.variables.get(scope)?.get(refParts[1]);
-        if (variable) this.addValueDependencies(variable.value, graph, dependentKey, variable.context);
-      } else if (refParts[0] === 'module') {
-        const moduleName = refParts[1];
-        const outputName = refParts[2];
-        const currentScope = this.getAddressScope(context);
-        const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
+    if (typedValue.type === 'Reference') this.addReferenceDependencies(typedValue.value as string[], graph, dependentKey, context);
+    else if (typedValue.type === 'String') this.addInterpolationDependencies(typedValue.value as string, graph, dependentKey, context);
+  }
 
-        const depKey = `${childScope}.outputs.${outputName}`;
-        if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
-      } else {
-        const depAddr = new Address(context.modulePath, refParts[0], refParts[1]);
-        const depKey = depAddr.toString();
-        if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
-      }
-    } else if (typedValue.type === 'String') {
-      const exprs = (typedValue.value as string).match(/\${([^}]+)}/g) || [];
-      for (const expr of exprs) {
-        const pathParts = expr.slice(2, -1).trim().split('.');
-        this.addValueDependencies({ type: 'Reference', value: pathParts }, graph, dependentKey, context);
-      }
+  private addReferenceDependencies(refParts: string[], graph: Graph<null>, dependentKey: string, context: Address): void {
+    if (refParts[0] === 'var') {
+      const scope = this.getAddressScope(context);
+      const variable = this.variables.get(scope)?.get(refParts[1]);
+      if (variable) this.addValueDependencies(variable.value, graph, dependentKey, variable.context);
+    } else if (refParts[0] === 'module') {
+      const moduleName = refParts[1];
+      const outputName = refParts[2];
+      const currentScope = this.getAddressScope(context);
+      const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
+
+      const depKey = `${childScope}.outputs.${outputName}`;
+      if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
+    } else {
+      const depAddr = new Address(context.modulePath, refParts[0], refParts[1]);
+      const depKey = depAddr.toString();
+      if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
     }
   }
 
-  private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState, loadedModules: LoadedModule[]): Promise<void> {
+  private addInterpolationDependencies(content: string, graph: Graph<null>, dependentKey: string, context: Address): void {
+    const exprs = content.match(/\${([^}]+)}/g) || [];
+    for (const expr of exprs) {
+      const pathParts = expr.slice(2, -1).trim().split('.');
+      this.addReferenceDependencies(pathParts, graph, dependentKey, context);
+    }
+  }
+
+  private async executeActionsSequentially(actions: PlanAction[], graph: Graph<null>, currentState: IState, loadedModules: LoadedModule[]): Promise<void> {
     const layers = graph.topologicalSort();
 
     for (const layer of layers)
       await Promise.all(
         layer.map(async (key: string) => {
           if (key.includes('.outputs.')) {
-            const parts = key.split('.outputs.');
-            const scope = parts[0];
-            const mod = loadedModules.find((m) => this.getAddressScope(m.address) === scope);
-            if (mod) this.processOutputs(mod.program, currentState, mod.address);
+            this.resolveOutputByKey(key, loadedModules, currentState);
             return;
           }
 
-          const action = actions.find((a) => {
-            const actionKey = new Address(a.modulePath || [], a.resourceType, a.name).toString();
-            return actionKey === key;
-          });
-
-          if (!action) return;
-
-          await this.executeAction(action, currentState);
+          const action = actions.find((a) => new Address(a.modulePath || [], a.resourceType, a.name).toString() === key);
+          if (action) await this.executeAction(action, currentState);
         })
       );
+  }
+
+  private buildExecutionGraph(loadedResources: LoadedResource[], loadedModules: LoadedModule[]): Graph<null> {
+    const graph = new Graph<null>();
+    for (const { uniqueId } of loadedResources) graph.addNode(uniqueId, null);
+
+    for (const mod of loadedModules) {
+      const scope = this.getAddressScope(mod.address);
+      for (const stmt of mod.program)
+        if (stmt.type === 'Output') {
+          const outputKey = scope ? `${scope}.outputs.${stmt.name}` : `outputs.${stmt.name}`;
+          graph.addNode(outputKey, null);
+          this.addValueDependencies(stmt.value, graph, outputKey, mod.address);
+        }
+    }
+
+    for (const { address, block } of loadedResources) this.addResourceDependencies(block, graph, address);
+
+    return graph;
+  }
+
+  private resolveOutputByKey(key: string, loadedModules: LoadedModule[], currentState: IState): void {
+    const parts = key.split('.outputs.');
+    const scope = parts[0];
+    const mod = loadedModules.find((m) => this.getAddressScope(m.address) === scope);
+    if (mod) this.processOutputs(mod.program, currentState, mod.address);
+  }
+
+  private syncStateVariables(currentState: IState): void {
+    const varsObj: Record<string, Record<string, unknown>> = {};
+    for (const [scope, varMap] of this.variables.entries()) {
+      const simpleVarMap: Record<string, unknown> = {};
+      for (const [k, v] of varMap.entries()) simpleVarMap[k] = v.value;
+      varsObj[scope] = simpleVarMap;
+    }
+    currentState.variables = varsObj;
   }
 
   private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
@@ -388,14 +354,14 @@ export class Orchestrator {
     if (!action.attributes) throw new Error('CREATE action missing attributes');
 
     const contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
-
     const inputs = this.convertAttributes(action.attributes, currentState, contextAddress);
+
     await provider.validate(action.resourceType, inputs);
-
     const id = await provider.create(action.resourceType, inputs);
-    const key = contextAddress.toString();
 
-    currentState.resources[key] = {
+    const key = contextAddress.toString();
+    const resources = currentState.resources; // Capture reference
+    resources[key] = {
       id,
       type: 'Resource',
       resourceType: action.resourceType,
@@ -437,7 +403,7 @@ export class Orchestrator {
   }
 
   private interpolateString(value: string, state: IState, context?: Address): string {
-    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
+    return value.replaceAll(/\${([^}]+)}/g, (_: string, expr: string) => {
       const pathParts = expr.trim().split('.');
       const resolved = this.resolveReference(pathParts, state, context);
       return String(resolved ?? '');
@@ -503,31 +469,82 @@ export class Orchestrator {
   private resolveResourceReference(pathParts: string[], state: IState, context?: Address): unknown {
     if (pathParts.length < 3) throw new Error(`Resource reference must include attribute: ${pathParts.join('.')}`);
 
+    const address = this.parseResourceAddress(pathParts.slice(0, -1), context);
+    const resourceKey = address.toString();
+    const resource = state.resources[resourceKey];
+
+    if (!resource) throw new Error(`Invalid resource reference "${pathParts.join('.')}": Resource "${resourceKey}" not found in state`);
+
     const attributeName = pathParts.at(-1)!;
-    const addressParts = pathParts.slice(0, -1);
+    return this.getResolvedAttribute(resource, attributeName, pathParts.join('.'));
+  }
 
-    try {
-      const address = addressParts[0] === 'module' ? Address.parse(addressParts.join('.')) : new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
+  private parseResourceAddress(addressParts: string[], context?: Address): Address {
+    if (addressParts[0] === 'module') return Address.parse(addressParts.join('.'));
+    return new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
+  }
 
-      const resourceKey = address.toString();
-      const resource = state.resources[resourceKey];
-      if (!resource) throw new Error(`Resource "${resourceKey}" not found in state`);
+  private getResolvedAttribute(resource: { id?: string; attributes: Record<string, any> }, attributeName: string, fullPath: string): unknown {
+    let attrValue: unknown = resource.attributes[attributeName];
+    if (attrValue === undefined && attributeName === 'id') attrValue = resource.id;
 
-      let attrValue: unknown = resource.attributes[attributeName];
-      if (attrValue === undefined && attributeName === 'id') attrValue = resource.id;
+    if (attrValue === undefined) throw new Error(`Invalid resource reference "${fullPath}": Attribute "${attributeName}" not found on resource`);
 
-      if (attrValue === undefined) throw new Error(`Attribute "${attributeName}" not found on resource "${resourceKey}"`);
+    // Handle reference objects stored in state (if any)
+    if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
 
-      if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
-
-      return attrValue;
-    } catch (error) {
-      throw new Error(`Invalid resource reference "${pathParts.join('.')}": ${(error as Error).message}`);
-    }
+    return attrValue;
   }
 
   private getAddressScope(address?: Address): string {
     if (!address) return '';
     return address.modulePath.map((p) => `module.${p}`).join('.');
+  }
+
+  private async loadChildModule(stmt: Statement, rootDir: string, parentAddress: Address, moduleAccumulator: LoadedModule[]): Promise<LoadedResource[]> {
+    if (stmt.type !== 'Module') return [];
+
+    const moduleName = stmt.name;
+    const attributesMap = this.getAttributesMap(stmt.attributes);
+
+    const sourceValue = (attributesMap.source as { value: unknown } | undefined)?.value;
+    if (typeof sourceValue !== 'string') throw new Error(`Module "${moduleName}" is missing a valid "source" attribute.`);
+
+    const moduleDir = path.resolve(rootDir, sourceValue);
+    const moduleProgram = this.parseModuleFile(moduleDir);
+
+    const childAddress = new Address([...parentAddress.modulePath, moduleName], '', '');
+    this.initializeChildVariables(childAddress, attributesMap, parentAddress);
+
+    const { resources } = await this.loadModuleTree(moduleProgram, moduleDir, childAddress, moduleAccumulator);
+    return resources;
+  }
+
+  private getAttributesMap(attributes: Record<string, AttributeValue> | undefined): Record<string, unknown> {
+    const attributesMap: Record<string, unknown> = {};
+    if (attributes) Object.assign(attributesMap, attributes);
+    return attributesMap;
+  }
+
+  private parseModuleFile(moduleDir: string): Statement[] {
+    const moduleFile = path.join(moduleDir, 'main.mf');
+    if (!fs.existsSync(moduleFile)) throw new Error(`Module source not found at: ${moduleFile}`);
+
+    const moduleContent = fs.readFileSync(moduleFile, 'utf8');
+    const parser = new Parser(new Lexer(moduleContent).tokenize());
+    return parser.parse() || [];
+  }
+
+  private initializeChildVariables(childAddress: Address, attributesMap: Record<string, unknown>, parentAddress: Address): void {
+    const childScopeKey = this.getAddressScope(childAddress);
+    if (!this.variables.has(childScopeKey)) this.variables.set(childScopeKey, new Map());
+    const childVars = this.variables.get(childScopeKey)!;
+
+    for (const [key, attr] of Object.entries(attributesMap))
+      if (key !== 'source')
+        childVars.set(key, {
+          value: attr,
+          context: parentAddress,
+        });
   }
 }
