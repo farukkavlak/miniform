@@ -62,8 +62,13 @@ async function executeApply(cwd: string, configPath: string, autoConfirm: boolea
   }
 
   console.log(chalk.blue('\napplying...'));
-  await orchestrator.apply(configContent);
+  const outputs = await orchestrator.apply(configContent);
   console.log(chalk.green('\nApply complete! Resources: ' + actions.length + ' processed.'));
+
+  if (Object.keys(outputs).length > 0) {
+    console.log(chalk.cyan('\nOutputs:'));
+    for (const [key, value] of Object.entries(outputs)) console.log(chalk.white(`  ${key} = ${JSON.stringify(value)}`));
+  }
 }
 
 export function createApplyCommand() {

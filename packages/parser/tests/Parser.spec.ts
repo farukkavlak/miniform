@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { ResourceBlock, VariableBlock } from '../src/ast';
 import { Lexer } from '../src/Lexer';
 import { Parser } from '../src/Parser';
 
@@ -42,7 +43,7 @@ describe('Miniform Parser', () => {
       const result = parser.parse();
 
       expect(result).toHaveLength(1);
-      expect(result[0].attributes.enabled).toEqual({ type: 'Boolean', value: false });
+      expect((result[0] as ResourceBlock).attributes.enabled).toEqual({ type: 'Boolean', value: false });
     });
 
     it('should parse multiple resources', () => {
@@ -61,7 +62,7 @@ describe('Miniform Parser', () => {
       const input = `resource "empty" "attributes" {}`;
       const parser = makeParser(input);
       const ast = parser.parse();
-      expect(ast[0].attributes).toEqual({});
+      expect((ast[0] as ResourceBlock).attributes).toEqual({});
     });
 
     it('should ignore comments', () => {
@@ -75,7 +76,7 @@ describe('Miniform Parser', () => {
       const parser = makeParser(input);
       const ast = parser.parse();
       expect(ast).toHaveLength(1);
-      expect(ast[0].attributes.key).toBeDefined();
+      expect((ast[0] as ResourceBlock).attributes.key).toBeDefined();
     });
 
     it('should ignore comment at EOF without newline', () => {
@@ -90,7 +91,7 @@ describe('Miniform Parser', () => {
       const parser = makeParser(input);
       const ast = parser.parse();
 
-      expect(ast[0].attributes.ref).toEqual({
+      expect((ast[0] as ResourceBlock).attributes.ref).toEqual({
         type: 'Reference',
         value: ['other_resource', 'field'],
       });
@@ -101,7 +102,7 @@ describe('Miniform Parser', () => {
       const parser = makeParser(input);
       const ast = parser.parse();
 
-      expect(ast[0].attributes.ref).toEqual({
+      expect((ast[0] as ResourceBlock).attributes.ref).toEqual({
         type: 'Reference',
         value: ['a', 'b', 'c', 'd'],
       });
@@ -139,7 +140,7 @@ describe('Miniform Parser', () => {
       const result = parser.parse();
 
       expect(result).toHaveLength(1);
-      expect(result[0].attributes.default).toEqual({ type: 'Number', value: 8080 });
+      expect((result[0] as VariableBlock).attributes.default).toEqual({ type: 'Number', value: 8080 });
     });
 
     it('should parse variable with boolean default', () => {
@@ -152,7 +153,7 @@ describe('Miniform Parser', () => {
       const result = parser.parse();
 
       expect(result).toHaveLength(1);
-      expect(result[0].attributes.default).toEqual({ type: 'Boolean', value: true });
+      expect((result[0] as VariableBlock).attributes.default).toEqual({ type: 'Boolean', value: true });
     });
 
     it('should parse multiple variables and resources', () => {
@@ -187,7 +188,7 @@ describe('Miniform Parser', () => {
       const parser = makeParser(input);
       const result = parser.parse();
 
-      expect(result[0].attributes.description).toEqual({ type: 'String', value: 'AWS region' });
+      expect((result[0] as VariableBlock).attributes.description).toEqual({ type: 'String', value: 'AWS region' });
     });
   });
 

@@ -1,4 +1,4 @@
-import { AttributeValue, Program, ResourceBlock, Statement, VariableBlock } from './ast';
+import { AttributeValue, OutputBlock, Program, ResourceBlock, Statement, VariableBlock } from './ast';
 import { Token, TokenType } from './tokens';
 
 export class Parser {
@@ -18,6 +18,7 @@ export class Parser {
   private statementParsers: Record<string, () => Statement> = {
     [TokenType.Resource]: this.parseResource.bind(this),
     [TokenType.Variable]: this.parseVariable.bind(this),
+    [TokenType.Output]: this.parseOutput.bind(this),
   };
 
   private parseStatement(): Statement {
@@ -70,6 +71,25 @@ export class Parser {
       type: 'Variable',
       name: nameToken.value,
       attributes,
+    };
+  }
+
+  private parseOutput(): OutputBlock {
+    // output "name" { value = ... }
+    const nameToken = this.consume(TokenType.String, "Expect output name string after 'output'.");
+
+    this.consume(TokenType.LBrace, "Expect '{' after output name.");
+    this.consume(TokenType.Identifier, "Expect 'value' keyword in output block.");
+    this.consume(TokenType.Assign, "Expect '=' after 'value'.");
+
+    const value = this.parseValue();
+
+    this.consume(TokenType.RBrace, "Expect '}' after output block.");
+
+    return {
+      type: 'Output',
+      name: nameToken.value,
+      value,
     };
   }
 

@@ -1,6 +1,7 @@
 export enum TokenType {
   Resource = 'RESOURCE', // 'resource' keyword
   Variable = 'VARIABLE', // 'variable' keyword
+  Output = 'OUTPUT', // 'output' keyword
   Identifier = 'IDENTIFIER', // Variable names, Types
   String = 'STRING', // "value"
   Number = 'NUMBER', // 123

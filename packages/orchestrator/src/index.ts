@@ -73,7 +73,7 @@ export class Orchestrator {
   /**
    * Execute a configuration file
    */
-  async apply(configContent: string): Promise<void> {
+  async apply(configContent: string): Promise<Record<string, unknown>> {
     // 1. Generate plan
     const allActions = await this.plan(configContent);
 
@@ -110,6 +110,25 @@ export class Orchestrator {
 
     // 8. Write final state after all operations
     await this.stateManager.write(currentState);
+
+    // 9. Process and return outputs
+    return this.processOutputs(program, currentState);
+  }
+
+  private processOutputs(program: ReturnType<Parser['parse']>, state: IState): Record<string, unknown> {
+    const outputs: Record<string, unknown> = {};
+    for (const stmt of program)
+      if (stmt.type === 'Output') {
+        const resolved = this.resolveValue(stmt.value, state);
+        outputs[stmt.name] = resolved;
+      }
+    return outputs;
+  }
+
+  private resolveValue(value: { type: string; value: unknown }, state: IState): unknown {
+    if (value.type === 'Reference') return this.resolveReference(value.value as string[], state);
+    if (value.type === 'String') return this.interpolateString(value.value as string, state);
+    return value.value;
   }
 
   private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>): void {
