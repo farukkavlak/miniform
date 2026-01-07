@@ -19,5 +19,12 @@ export interface OutputBlock {
   value: AttributeValue;
 }
 
-export type Statement = ResourceBlock | VariableBlock | OutputBlock;
+export interface DataBlock {
+  type: 'Data';
+  dataSourceType: string; // e.g., "aws_ami"
+  name: string; // e.g., "ubuntu"
+  attributes: Record<string, AttributeValue>;
+}
+
+export type Statement = ResourceBlock | VariableBlock | OutputBlock | DataBlock;
 export type Program = Statement[];

@@ -215,7 +215,7 @@
 ### 9.1. Data Sources
 
 - [ ] **Data Source Parsing**
-  - [ ] `data "type" "name" {}` syntax
+  - [x] `data "type" "name" {}` syntax
   - [ ] Data source provider interface
 - [ ] **Read-Only Operations**
   - [ ] Query existing resources

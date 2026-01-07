@@ -139,4 +139,43 @@ describe('Planner', () => {
     expect(actions[0].type).toBe('CREATE');
     expect(actions[0].resourceType).toBe('mock_resource');
   });
+
+  it('should plan DELETE + CREATE when forceNew attribute changes', () => {
+    const desired: Program = [
+      {
+        type: 'Resource',
+        resourceType: 'mock_resource',
+        name: 'test_resource_f',
+        attributes: { path: { type: 'String', value: 'new_path' } },
+      },
+    ];
+
+    const current: IState = {
+      version: 1,
+      resources: {
+        'mock_resource.test_resource_f': {
+          id: 'mock_id_123',
+          type: 'Resource',
+          resourceType: 'mock_resource',
+          name: 'test_resource_f',
+          attributes: { path: { type: 'String', value: 'old_path' } },
+        },
+      },
+    };
+
+    const schemas = {
+      mock_resource: {
+        path: { type: 'string' as const, required: true, forceNew: true },
+      },
+    };
+
+    const actions = plan(desired, current, schemas);
+
+    // Should have DELETE followed by CREATE
+    expect(actions).toHaveLength(2);
+    expect(actions[0].type).toBe('DELETE');
+    expect(actions[0].id).toBe('mock_id_123');
+    expect(actions[1].type).toBe('CREATE');
+    expect(actions[1].attributes).toEqual({ path: { type: 'String', value: 'new_path' } });
+  });
 });

@@ -1,4 +1,4 @@
-import { AttributeValue, OutputBlock, Program, ResourceBlock, Statement, VariableBlock } from './ast';
+import { AttributeValue, DataBlock, OutputBlock, Program, ResourceBlock, Statement, VariableBlock } from './ast';
 import { Token, TokenType } from './tokens';
 
 export class Parser {
@@ -18,6 +18,7 @@ export class Parser {
   private statementParsers: Record<string, () => Statement> = {
     [TokenType.Resource]: this.parseResource.bind(this),
     [TokenType.Variable]: this.parseVariable.bind(this),
+    [TokenType.Data]: this.parseData.bind(this),
     [TokenType.Output]: this.parseOutput.bind(this),
   };
 
@@ -46,6 +47,31 @@ export class Parser {
     return {
       type: 'Resource',
       resourceType: typeToken.value,
+      name: nameToken.value,
+      attributes,
+    };
+  }
+
+  private parseData(): DataBlock {
+    // data "type" "name" { ... }
+    const typeToken = this.consume(TokenType.String, "Expect data source type string after 'data'.");
+    const nameToken = this.consume(TokenType.String, 'Expect data source name string after data source type.');
+
+    this.consume(TokenType.LBrace, "Expect '{' after data source name.");
+
+    const attributes: Record<string, AttributeValue> = {};
+    while (!this.check(TokenType.RBrace) && !this.isAtEnd()) {
+      const key = this.consume(TokenType.Identifier, 'Expect attribute name.').value;
+      this.consume(TokenType.Assign, "Expect '=' after attribute name.");
+      const value = this.parseValue();
+      attributes[key] = value;
+    }
+
+    this.consume(TokenType.RBrace, "Expect '}' after block body.");
+
+    return {
+      type: 'Data',
+      dataSourceType: typeToken.value,
       name: nameToken.value,
       attributes,
     };
@@ -99,22 +125,24 @@ export class Parser {
     if (this.matchToken(TokenType.Boolean)) return { type: 'Boolean', value: this.previous().value === 'true' };
 
     // Reference Parsing: identifier.key.subkey
-    if (this.check(TokenType.Identifier)) {
-      const parts: string[] = [];
-
-      // First part
-      parts.push(this.advance().value);
-
-      // Subsequent parts (dot separated)
-      while (this.matchToken(TokenType.Dot)) {
-        const part = this.consume(TokenType.Identifier, 'Expect property name after dot.');
-        parts.push(part.value);
-      }
-
-      return { type: 'Reference', value: parts };
-    }
+    if (this.check(TokenType.Identifier) || this.check(TokenType.Data)) return this.parseReference();
 
     return this.error(`Unexpected value: ${this.peek().value}`);
+  }
+
+  private parseReference(): AttributeValue {
+    const parts: string[] = [];
+
+    // First part
+    parts.push(this.advance().value);
+
+    // Subsequent parts (dot separated)
+    while (this.matchToken(TokenType.Dot))
+      if (this.check(TokenType.Identifier) || this.check(TokenType.Data) || this.check(TokenType.Variable) || this.check(TokenType.Resource) || this.check(TokenType.Output))
+        parts.push(this.advance().value);
+      else return this.error('Expect property name after dot.');
+
+    return { type: 'Reference', value: parts };
   }
 
   private matchToken(...types: TokenType[]): boolean {

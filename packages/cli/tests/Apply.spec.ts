@@ -14,6 +14,8 @@ vi.mock('chalk', () => ({
     green: vi.fn((m) => m),
     yellow: vi.fn((m) => m),
     red: vi.fn((m) => m),
+    cyan: vi.fn((m) => m),
+    white: vi.fn((m) => m),
     bold: vi.fn((m) => m),
   },
 }));
@@ -187,6 +189,37 @@ describe('CLI: apply command', () => {
     await createApplyCommand().parseAsync(['node', 'miniform', 'apply']);
 
     expect(consoleSpy).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should display outputs when returned from apply', async () => {
+    vi.mocked(fs.access).mockResolvedValue(void 0);
+    vi.mocked(fs.readFile).mockResolvedValue('content');
+
+    const planMock = vi.fn().mockResolvedValue([{ type: 'CREATE', resourceType: 'test', name: 't' }]);
+    const applyMock = vi.fn().mockResolvedValue({
+      my_output: 'test_value',
+      another_output: 42,
+    });
+
+    vi.mocked(Orchestrator).mockImplementation(function () {
+      return {
+        registerProvider: vi.fn(),
+        plan: planMock,
+        apply: applyMock,
+      } as Partial<Orchestrator> as Orchestrator;
+    });
+
+    vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: true });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await createApplyCommand().parseAsync(['node', 'miniform', 'apply']);
+
+    expect(applyMock).toHaveBeenCalled();
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Outputs:'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('my_output = "test_value"'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('another_output = 42'));
 
     consoleSpy.mockRestore();
   });

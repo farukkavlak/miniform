@@ -7,6 +7,7 @@ import { IState, StateManager } from '@miniform/state';
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
   private variables: Map<string, unknown> = new Map();
+  private dataSources: Map<string, Record<string, unknown>> = new Map();
   private stateManager: StateManager;
 
   constructor(workingDir?: string) {
@@ -43,6 +44,28 @@ export class Orchestrator {
       }
   }
 
+  private async processDataSources(program: ReturnType<Parser['parse']>, state: IState): Promise<void> {
+    this.dataSources.clear();
+
+    for (const stmt of program)
+      if (stmt.type === 'Data') {
+        const provider = this.providers.get(stmt.dataSourceType);
+        if (!provider) throw new Error(`Provider for data source type "${stmt.dataSourceType}" not registered`);
+
+        // Resolve inputs (attributes)
+        const inputs = this.convertAttributes(stmt.attributes, state);
+
+        // Validate inputs
+        await provider.validate(stmt.dataSourceType, inputs);
+
+        // Read data
+        const resolvedAttributes = await provider.read(stmt.dataSourceType, inputs);
+
+        // Store in dataSources map
+        this.dataSources.set(`${stmt.dataSourceType}.${stmt.name}`, resolvedAttributes);
+      }
+  }
+
   /**
    * Generate an execution plan without applying it
    */
@@ -58,7 +81,10 @@ export class Orchestrator {
     // 3. Load current state
     const currentState = await this.stateManager.read();
 
-    // 4. Generate execution plan
+    // 4. Process Data Sources (Resolve them before planning)
+    await this.processDataSources(program, currentState);
+
+    // 5. Generate execution plan
     // Fetch schemas for all resources in desired state
     const schemas: Record<string, ISchema> = {};
     for (const stmt of program)
@@ -80,7 +106,7 @@ export class Orchestrator {
     // 2. Load current state (needed for graph building and execution)
     const currentState = await this.stateManager.read();
 
-    // 3. Parse config again to build graph (optimized to reuse parse result in future, but keeping simple for now)
+    // 3. Parse config again to build graph
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
     const program = parser.parse();
@@ -122,6 +148,7 @@ export class Orchestrator {
         const resolved = this.resolveValue(stmt.value, state);
         outputs[stmt.name] = resolved;
       }
+
     return outputs;
   }
 
@@ -176,7 +203,6 @@ export class Orchestrator {
       }
 
       case 'NO_OP': {
-        // Do nothing
         break;
       }
 
@@ -200,7 +226,7 @@ export class Orchestrator {
       type: 'Resource',
       resourceType: action.resourceType,
       name: action.name,
-      attributes: action.attributes,
+      attributes: inputs, // Store resolved inputs, not method attributes with placeholders
     };
   }
 
@@ -214,10 +240,11 @@ export class Orchestrator {
     for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
 
     const inputs = this.convertAttributes(newAttributes, currentState);
+
     await provider.validate(action.resourceType, inputs);
     await provider.update(action.id, action.resourceType, inputs);
 
-    currentResource.attributes = newAttributes;
+    currentResource.attributes = inputs; // Update state with resolved values
   }
 
   private async executeDelete(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
@@ -261,14 +288,34 @@ export class Orchestrator {
   private resolveReference(path: string[], state: IState): unknown {
     if (path.length < 2) throw new Error(`Invalid reference path: ${path.join('.')}`);
 
-    // Variable reference: var.name
-    if (path[0] === 'var') {
-      const varName = path[1];
-      if (!this.variables.has(varName)) throw new Error(`Variable "${varName}" is not defined`);
-      return this.variables.get(varName);
-    }
+    if (path[0] === 'var') return this.resolveVariableReference(path);
+    if (path[0] === 'data') return this.resolveDataSourceReference(path);
+    return this.resolveResourceReference(path, state);
+  }
 
-    // Resource reference: type.name.attribute
+  private resolveVariableReference(path: string[]): unknown {
+    const varName = path[1];
+    if (!this.variables.has(varName)) throw new Error(`Variable "${varName}" is not defined`);
+    return this.variables.get(varName);
+  }
+
+  private resolveDataSourceReference(path: string[]): unknown {
+    if (path.length < 4) throw new Error(`Data source reference must include attribute: ${path.join('.')}`);
+
+    const dataSourceKey = `${path[1]}.${path[2]}`;
+    const dataAttributes = this.dataSources.get(dataSourceKey);
+
+    if (!dataAttributes) throw new Error(`Data source "${dataSourceKey}" not found (or not resolved yet)`);
+
+    const attrName = path[3];
+    const attrValue = dataAttributes[attrName];
+
+    if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on data source "${dataSourceKey}"`);
+
+    return attrValue;
+  }
+
+  private resolveResourceReference(path: string[], state: IState): unknown {
     if (path.length < 3) throw new Error(`Resource reference must include attribute: ${path.join('.')}`);
 
     const resourceKey = `${path[0]}.${path[1]}`;
@@ -279,7 +326,8 @@ export class Orchestrator {
     const attrValue = resource.attributes[attrName];
     if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on resource "${resourceKey}"`);
 
-    if (attrValue && typeof attrValue === 'object' && 'value' in attrValue) return attrValue.value;
+    if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
+
     return attrValue;
   }
 }

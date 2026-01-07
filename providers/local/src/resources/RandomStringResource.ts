@@ -47,4 +47,9 @@ export class RandomStringResource implements IResourceHandler {
   async delete(_id: string): Promise<void> {
     // No-op
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async read(_inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
+    return {};
+  }
 }

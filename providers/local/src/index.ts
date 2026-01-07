@@ -50,6 +50,13 @@ export class LocalProvider implements IProvider {
 
     await handler.delete(id);
   }
+
+  async read(type: string, inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const handler = this.handlers.get(type);
+    if (!handler) throw new Error(`Unsupported resource type: ${type}`);
+
+    return await handler.read(inputs);
+  }
 }
 
 export { LocalFileResource } from './resources/LocalFileResource';

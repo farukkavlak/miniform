@@ -29,6 +29,11 @@ export interface IProvider {
   /** Validates inputs against the resource schema. Throws validation error if invalid. */
   validate(type: string, inputs: Record<string, unknown>): Promise<void>;
 
+  /**
+   * Read a data source
+   */
+  read(type: string, inputs: Record<string, unknown>): Promise<Record<string, unknown>>;
+
   create(type: string, inputs: Record<string, unknown>): Promise<string>;
   update(id: string, type: string, inputs: Record<string, unknown>): Promise<void>;
   delete(id: string, type: string): Promise<void>;
@@ -48,6 +53,11 @@ export interface IResourceHandler {
    * Validate resource inputs before creation/update
    */
   validate(inputs: Record<string, unknown>): Promise<void>;
+
+  /**
+   * Read a data source
+   */
+  read(inputs: Record<string, unknown>): Promise<Record<string, unknown>>;
 
   /**
    * Create a new resource
