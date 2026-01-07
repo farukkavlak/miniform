@@ -4,6 +4,7 @@ import path from 'node:path';
 
 export interface IState {
   version: number;
+  variables?: Record<string, unknown>;
   resources: Record<string, IResource>;
 }
 
@@ -20,7 +21,7 @@ export class StateManager {
       return JSON.parse(content.toString('utf8')) as IState;
     } catch (error) {
       const err = error as { code?: string };
-      if (err.code === 'ENOENT') return { version: 1, resources: {} };
+      if (err.code === 'ENOENT') return { version: 1, variables: {}, resources: {} };
       throw error;
     }
   }

@@ -101,9 +101,9 @@
 - [x] **Parser Error Reporting:** Detailed line/column error messages.
 - [x] **Variables Support:** Support for usage of `var.name`.
 - [x] **Parallel Graph Execution:** Execute independent nodes in parallel.
-- [ ] **String Interpolation:** `${var.x}` support (requires Lexer templates).
-- [ ] **Variable Blocks:** `variable "env" { default = "dev" }` parsing.
-- [ ] **Reference Resolution:** Planner logic to resolve `Reference` nodes to values.
+- [x] **String Interpolation:** `${var.x}` support (requires Lexer templates).
+- [x] **Variable Blocks:** `variable "env" { default = "dev" }` parsing.
+- [x] **Reference Resolution:** Planner logic to resolve `Reference` nodes to values.
 
 ---
 
