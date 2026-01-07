@@ -125,22 +125,24 @@ export class Parser {
     if (this.matchToken(TokenType.Boolean)) return { type: 'Boolean', value: this.previous().value === 'true' };
 
     // Reference Parsing: identifier.key.subkey
-    if (this.check(TokenType.Identifier) || this.check(TokenType.Data)) {
-      const parts: string[] = [];
-
-      // First part
-      parts.push(this.advance().value);
-
-      // Subsequent parts (dot separated)
-      while (this.matchToken(TokenType.Dot))
-        if (this.check(TokenType.Identifier) || this.check(TokenType.Data) || this.check(TokenType.Variable) || this.check(TokenType.Resource) || this.check(TokenType.Output))
-          parts.push(this.advance().value);
-        else return this.error('Expect property name after dot.');
-
-      return { type: 'Reference', value: parts };
-    }
+    if (this.check(TokenType.Identifier) || this.check(TokenType.Data)) return this.parseReference();
 
     return this.error(`Unexpected value: ${this.peek().value}`);
+  }
+
+  private parseReference(): AttributeValue {
+    const parts: string[] = [];
+
+    // First part
+    parts.push(this.advance().value);
+
+    // Subsequent parts (dot separated)
+    while (this.matchToken(TokenType.Dot))
+      if (this.check(TokenType.Identifier) || this.check(TokenType.Data) || this.check(TokenType.Variable) || this.check(TokenType.Resource) || this.check(TokenType.Output))
+        parts.push(this.advance().value);
+      else return this.error('Expect property name after dot.');
+
+    return { type: 'Reference', value: parts };
   }
 
   private matchToken(...types: TokenType[]): boolean {

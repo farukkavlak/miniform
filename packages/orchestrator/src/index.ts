@@ -288,31 +288,34 @@ export class Orchestrator {
   private resolveReference(path: string[], state: IState): unknown {
     if (path.length < 2) throw new Error(`Invalid reference path: ${path.join('.')}`);
 
-    // Variable reference: var.name
-    if (path[0] === 'var') {
-      const varName = path[1];
-      if (!this.variables.has(varName)) throw new Error(`Variable "${varName}" is not defined`);
-      return this.variables.get(varName);
-    }
+    if (path[0] === 'var') return this.resolveVariableReference(path);
+    if (path[0] === 'data') return this.resolveDataSourceReference(path);
+    return this.resolveResourceReference(path, state);
+  }
 
-    // Data Source reference: data.type.name.attribute
-    if (path[0] === 'data') {
-      if (path.length < 4) throw new Error(`Data source reference must include attribute: ${path.join('.')}`);
+  private resolveVariableReference(path: string[]): unknown {
+    const varName = path[1];
+    if (!this.variables.has(varName)) throw new Error(`Variable "${varName}" is not defined`);
+    return this.variables.get(varName);
+  }
 
-      const dataSourceKey = `${path[1]}.${path[2]}`;
-      const dataAttributes = this.dataSources.get(dataSourceKey);
+  private resolveDataSourceReference(path: string[]): unknown {
+    if (path.length < 4) throw new Error(`Data source reference must include attribute: ${path.join('.')}`);
 
-      if (!dataAttributes) throw new Error(`Data source "${dataSourceKey}" not found (or not resolved yet)`);
+    const dataSourceKey = `${path[1]}.${path[2]}`;
+    const dataAttributes = this.dataSources.get(dataSourceKey);
 
-      const attrName = path[3];
-      const attrValue = dataAttributes[attrName];
+    if (!dataAttributes) throw new Error(`Data source "${dataSourceKey}" not found (or not resolved yet)`);
 
-      if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on data source "${dataSourceKey}"`);
+    const attrName = path[3];
+    const attrValue = dataAttributes[attrName];
 
-      return attrValue;
-    }
+    if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on data source "${dataSourceKey}"`);
 
-    // Resource reference: type.name.attribute
+    return attrValue;
+  }
+
+  private resolveResourceReference(path: string[], state: IState): unknown {
     if (path.length < 3) throw new Error(`Resource reference must include attribute: ${path.join('.')}`);
 
     const resourceKey = `${path[0]}.${path[1]}`;
