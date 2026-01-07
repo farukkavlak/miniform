@@ -379,4 +379,131 @@ describe('Orchestrator', () => {
       expect(inputs).toEqual({});
     });
   });
+
+  describe('Variable Processing', () => {
+    it('should process variables and use them with var.name reference', async () => {
+      const config = `
+        variable "greeting" {
+          default = "Hello World"
+        }
+
+        resource "mock_resource" "test" {
+          message = var.greeting
+        }
+      `;
+
+      await orchestrator.apply(config);
+
+      const created = mockProvider.getCreatedResources();
+      expect(created.size).toBe(1);
+
+      const [, inputs] = Array.from(created.entries())[0];
+      expect(inputs.message).toBe('Hello World');
+    });
+
+    it('should throw error for undefined variable', async () => {
+      const config = `
+        resource "mock_resource" "test" {
+          message = var.undefined_var
+        }
+      `;
+
+      await expect(orchestrator.apply(config)).rejects.toThrow('Variable "undefined_var" is not defined');
+    });
+  });
+
+  describe('String Interpolation', () => {
+    it('should interpolate variables in strings', async () => {
+      const config = `
+        variable "name" {
+          default = "Miniform"
+        }
+
+        variable "version" {
+          default = "1.0.0"
+        }
+
+        resource "mock_resource" "test" {
+          greeting = "Hello \${var.name}! Version: \${var.version}"
+        }
+      `;
+
+      await orchestrator.apply(config);
+
+      const created = mockProvider.getCreatedResources();
+      const [, inputs] = Array.from(created.entries())[0];
+      expect(inputs.greeting).toBe('Hello Miniform! Version: 1.0.0');
+    });
+
+    it('should handle strings without interpolation', async () => {
+      const config = `
+        resource "mock_resource" "test" {
+          message = "Plain text without interpolation"
+        }
+      `;
+
+      await orchestrator.apply(config);
+
+      const created = mockProvider.getCreatedResources();
+      const [, inputs] = Array.from(created.entries())[0];
+      expect(inputs.message).toBe('Plain text without interpolation');
+    });
+  });
+
+  describe('Resource Dependencies', () => {
+    it('should respect dependency order from resource references', async () => {
+      const config = `
+        resource "mock_resource" "first" {
+          name = "first"
+        }
+
+        resource "mock_resource" "second" {
+          name = "second"
+        }
+      `;
+
+      await orchestrator.apply(config);
+
+      const created = mockProvider.getCreatedResources();
+      expect(created.size).toBe(2);
+    });
+
+    it('should handle resource with reference to another resource attribute', async () => {
+      const config1 = `
+        resource "mock_resource" "first" {
+          name = "first_resource"
+        }
+      `;
+
+      await orchestrator.apply(config1);
+
+      // Second apply with reference - this should add dependency edge
+      const config2 = `
+        resource "mock_resource" "first" {
+          name = "first_resource"
+        }
+
+        resource "mock_resource" "second" {
+          depends_on = mock_resource.first.name
+        }
+      `;
+
+      await orchestrator.apply(config2);
+
+      const created = mockProvider.getCreatedResources();
+      expect(created.size).toBe(2);
+    });
+  });
+
+  describe('Reference Resolution Errors', () => {
+    it('should throw error for resource not found in state', async () => {
+      const config = `
+        resource "mock_resource" "test" {
+          ref = nonexistent_resource.foo.bar
+        }
+      `;
+
+      await expect(orchestrator.apply(config)).rejects.toThrow('not found in state');
+    });
+  });
 });
