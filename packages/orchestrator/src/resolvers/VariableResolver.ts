@@ -4,9 +4,6 @@ import { Address } from '../Address';
 import { ScopeManager } from '../scope/ScopeManager';
 import { IResolver } from './IResolver';
 
-/**
- * Resolves variable references (var.name)
- */
 export class VariableResolver implements IResolver {
   constructor(
     private scopeManager: ScopeManager,

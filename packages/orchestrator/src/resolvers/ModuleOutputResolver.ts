@@ -4,13 +4,10 @@ import { Address } from '../Address';
 import { ScopeManager } from '../scope/ScopeManager';
 import { IResolver } from './IResolver';
 
-/**
- * Resolves module output references (module.name.output)
- */
 export class ModuleOutputResolver implements IResolver {
   constructor(private scopeManager: ScopeManager) {}
 
-  resolve(pathParts: string[], context: Address): unknown {
+  resolve(pathParts: string[], context: Address, _state: IState): unknown {
     if (pathParts.length < 3) throw new Error(`Module output reference must include output name: ${pathParts.join('.')}`);
 
     const [, moduleName, outputName] = pathParts;

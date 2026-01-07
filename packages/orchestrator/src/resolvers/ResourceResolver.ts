@@ -4,9 +4,6 @@ import { Address } from '../Address';
 import { ScopeManager } from '../scope/ScopeManager';
 import { IResolver } from './IResolver';
 
-/**
- * Resolves resource attribute references (resource_type.name.attribute)
- */
 export class ResourceResolver implements IResolver {
   constructor(private scopeManager: ScopeManager) {}
 
@@ -34,7 +31,6 @@ export class ResourceResolver implements IResolver {
 
     if (attrValue === undefined) throw new Error(`Invalid resource reference "${fullPath}": Attribute "${attributeName}" not found on resource`);
 
-    // Handle reference objects stored in state (if any)
     if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
 
     return attrValue;
