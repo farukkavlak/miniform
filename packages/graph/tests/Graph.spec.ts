@@ -100,4 +100,11 @@ describe('Graph', () => {
     graph.addNode('A', 'val');
     expect(() => graph.addEdge('A', 'Z')).toThrow(/node z does not exist/i);
   });
+
+  it('should check if node exists', () => {
+    const graph = new Graph<string>();
+    graph.addNode('A', 'val');
+    expect(graph.hasNode('A')).toBe(true);
+    expect(graph.hasNode('B')).toBe(false);
+  });
 });
