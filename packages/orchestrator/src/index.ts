@@ -7,6 +7,8 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 
 import { Address } from './Address';
+import { ReferenceResolver } from './resolvers/ReferenceResolver';
+import { ScopeManager } from './scope/ScopeManager';
 
 export interface LoadedResource {
   uniqueId: string; // "module.vpc.aws_subnet.private"
@@ -26,15 +28,15 @@ interface VariableValue {
 
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
-  // Map<ScopeAddressString, Map<VarName, VariableValue>>
-  private variables: Map<string, Map<string, VariableValue>> = new Map();
-  // Map<ScopeAddressString, Map<OutputName, ResolvedValue>>
-  private outputsRegistry: Map<string, Map<string, unknown>> = new Map();
   private dataSources: Map<string, Record<string, unknown>> = new Map();
   private stateManager: StateManager;
+  private scopeManager: ScopeManager;
+  private referenceResolver: ReferenceResolver;
 
   constructor(stateManager: StateManager) {
     this.stateManager = stateManager;
+    this.scopeManager = new ScopeManager();
+    this.referenceResolver = new ReferenceResolver(this.scopeManager, this.dataSources);
   }
 
   /**
@@ -58,20 +60,13 @@ export class Orchestrator {
   /**
    * Process variable declarations for a specific scope
    */
-  private processVariables(program: Statement[], scopeAddress: Address): void {
-    const scope = this.getAddressScope(scopeAddress);
-    if (!this.variables.has(scope)) this.variables.set(scope, new Map());
-    const scopeVars = this.variables.get(scope)!;
+  private processVariables(program: Statement[], address: Address): void {
+    const scope = this.scopeManager.getScope(address);
 
     for (const stmt of program)
       if (stmt.type === 'Variable') {
-        const defaultValue = stmt.attributes.default?.value;
-        // Only set default if not already set (e.g. by module inputs)
-        if (!scopeVars.has(stmt.name))
-          scopeVars.set(stmt.name, {
-            value: defaultValue,
-            context: scopeAddress, // Defaults are defined in the module's own scope
-          });
+        const value = stmt.default !== undefined ? stmt.default : null;
+        this.scopeManager.setVariable(scope, stmt.name, { value, context: address });
       }
   }
 
