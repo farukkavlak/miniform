@@ -511,4 +511,72 @@ describe('Orchestrator', () => {
       await expect(orchestrator.apply(config)).rejects.toThrow('not found in state');
     });
   });
+
+  describe('Output Processing', () => {
+    it('should process and return outputs with literal values', async () => {
+      const config = `
+        output "my_string" {
+          value = "test_value"
+        }
+        output "my_number" {
+          value = 42
+        }
+      `;
+
+      const outputs = await orchestrator.apply(config);
+
+      expect(outputs).toEqual({
+        my_string: 'test_value',
+        my_number: 42,
+      });
+    });
+
+    it('should process outputs with resource references', async () => {
+      const config = `
+        resource "mock_resource" "test" {
+          name = "my_resource"
+        }
+        output "resource_name" {
+          value = mock_resource.test.name
+        }
+      `;
+
+      const outputs = await orchestrator.apply(config);
+
+      expect(outputs.resource_name).toBe('my_resource');
+    });
+
+    it('should process outputs with string interpolation', async () => {
+      const config = `
+        variable "env" {
+          default = "production"
+        }
+        output "message" {
+          value = "Environment: \${var.env}"
+        }
+      `;
+
+      const outputs = await orchestrator.apply(config);
+
+      expect(outputs.message).toBe('Environment: production');
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle NO_OP actions correctly', async () => {
+      const config = `
+        resource "mock_resource" "test" {
+          name = "value"
+        }
+      `;
+
+      // First apply
+      await orchestrator.apply(config);
+
+      // Second apply with same config (should be NO_OP)
+      const outputs = await orchestrator.apply(config);
+
+      expect(outputs).toEqual({});
+    });
+  });
 });
