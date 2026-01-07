@@ -4,6 +4,8 @@ import { Lexer, Parser, ResourceBlock } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
 
+import { Address } from './Address';
+
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
   private variables: Map<string, unknown> = new Map();
@@ -115,7 +117,7 @@ export class Orchestrator {
     const graph = new Graph<null>();
     for (const stmt of program)
       if (stmt.type === 'Resource') {
-        const key = `${stmt.resourceType}.${stmt.name}`;
+        const key = Address.root(stmt.resourceType, stmt.name).toString();
         graph.addNode(key, null);
       }
 
@@ -174,7 +176,7 @@ export class Orchestrator {
       // Execute all actions in this layer in parallel
       await Promise.all(
         layer.map(async (resourceKey: string) => {
-          const action = actions.find((a) => `${a.resourceType}.${a.name}` === resourceKey);
+          const action = actions.find((a) => new Address(a.modulePath || [], a.resourceType, a.name).toString() === resourceKey);
           if (!action) return;
 
           await this.executeAction(action, currentState);
@@ -220,8 +222,10 @@ export class Orchestrator {
 
     const id = await provider.create(action.resourceType, inputs);
 
+    const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
+
     // eslint-disable-next-line require-atomic-updates
-    currentState.resources[`${action.resourceType}.${action.name}`] = {
+    currentState.resources[key] = {
       id,
       type: 'Resource',
       resourceType: action.resourceType,
@@ -234,7 +238,8 @@ export class Orchestrator {
     if (!action.id) throw new Error('UPDATE action missing id');
     if (!action.changes) throw new Error('UPDATE action missing changes');
 
-    const currentResource = currentState.resources[`${action.resourceType}.${action.name}`];
+    const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
+    const currentResource = currentState.resources[key];
     const newAttributes = { ...currentResource.attributes };
 
     for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
@@ -252,7 +257,8 @@ export class Orchestrator {
 
     await provider.delete(action.id, action.resourceType);
 
-    delete currentState.resources[`${action.resourceType}.${action.name}`];
+    const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
+    delete currentState.resources[key];
   }
 
   private convertAttributes(attributes: Record<string, unknown>, state: IState): Record<string, unknown> {
@@ -318,16 +324,29 @@ export class Orchestrator {
   private resolveResourceReference(path: string[], state: IState): unknown {
     if (path.length < 3) throw new Error(`Resource reference must include attribute: ${path.join('.')}`);
 
-    const resourceKey = `${path[0]}.${path[1]}`;
-    const resource = state.resources[resourceKey];
-    if (!resource) throw new Error(`Resource "${resourceKey}" not found in state`);
+    // Parse path into Address + Attribute
+    // path format: [...modulePath, type, name, attribute]
 
-    const attrName = path[2];
-    const attrValue = resource.attributes[attrName];
-    if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on resource "${resourceKey}"`);
+    const attributeName = path[path.length - 1];
+    const addressParts = path.slice(0, -1);
+    const addressString = addressParts.join('.');
 
-    if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
+    try {
+      const address = Address.parse(addressString);
+      const resourceKey = address.toString();
 
-    return attrValue;
+      const resource = state.resources[resourceKey];
+      if (!resource) throw new Error(`Resource "${resourceKey}" not found in state`);
+
+      const attrValue = resource.attributes[attributeName];
+      if (attrValue === undefined) throw new Error(`Attribute "${attributeName}" not found on resource "${resourceKey}"`);
+
+      if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
+
+      return attrValue;
+    } catch (e) {
+      // If Address.parse fails, maybe it's not a valid resource address
+      throw new Error(`Invalid resource reference "${path.join('.')}": ${(e as Error).message}`);
+    }
   }
 }

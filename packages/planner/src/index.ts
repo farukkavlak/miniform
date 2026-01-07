@@ -9,6 +9,7 @@ export interface PlanAction {
   type: ActionType;
   resourceType: string;
   name: string;
+  modulePath?: string[]; // Path of modules leading to this resource
   id?: string;
   attributes?: Record<string, AttributeValue>;
   changes?: Record<string, { old: AttributeValue | undefined; new: AttributeValue | undefined }>;
