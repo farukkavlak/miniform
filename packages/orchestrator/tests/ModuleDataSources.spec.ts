@@ -1,7 +1,7 @@
 import { plan } from '@miniform/planner';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { Orchestrator } from '../src/index';
 
@@ -9,6 +9,7 @@ vi.mock('node:fs');
 vi.mock('node:path');
 
 const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, version: 1 });
+// eslint-disable-next-line unicorn/no-useless-undefined
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => ({
@@ -24,7 +25,15 @@ vi.mock('@miniform/planner', () => ({
 
 describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
   let orchestrator: Orchestrator;
-  let mockProvider: any;
+  let mockProvider: {
+    resources: string[];
+    validate: Mock;
+    create: Mock;
+    read: Mock;
+    update: Mock;
+    delete: Mock;
+    getSchema: Mock;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,12 +45,14 @@ describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
         if (type === 'aws_ami') return { id: `ami-${inputs.name}` };
         return {};
       }),
+      update: vi.fn(),
+      delete: vi.fn(),
       getSchema: vi.fn().mockReturnValue({}),
     };
     orchestrator = new Orchestrator();
     orchestrator.registerProvider(mockProvider);
-    (path.resolve as any).mockImplementation((...args: string[]) => args.join('/'));
-    (path.join as any).mockImplementation((...args: string[]) => args.join('/'));
+    (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
+    (path.join as Mock).mockImplementation((...args: string[]) => args.join('/'));
   });
 
   it('should resolve data sources defined in modules', async () => {
@@ -59,13 +70,13 @@ describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
             }
         `;
 
-    (fs.existsSync as any).mockReturnValue(true);
-    (fs.readFileSync as any).mockImplementation((filePath: string) => {
+    (fs.existsSync as Mock).mockReturnValue(true);
+    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
       if (filePath.endsWith('app/main.mf')) return appConfig;
       return rootConfig;
     });
 
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',
@@ -97,10 +108,10 @@ describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
             }
         `;
 
-    (fs.existsSync as any).mockReturnValue(true);
-    (fs.readFileSync as any).mockImplementation((f: string) => (f.endsWith('app/main.mf') ? appConfig : rootConfig));
+    (fs.existsSync as Mock).mockReturnValue(true);
+    (fs.readFileSync as Mock).mockImplementation((f: string) => (f.endsWith('app/main.mf') ? appConfig : rootConfig));
 
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',

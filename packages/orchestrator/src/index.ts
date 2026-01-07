@@ -1,10 +1,10 @@
 import { IProvider, ISchema } from '@miniform/contracts';
 import { Graph } from '@miniform/graph';
-import { Lexer, Parser, ResourceBlock } from '@miniform/parser';
+import { Lexer, Parser, ResourceBlock, Statement } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
+import path from 'node:path';
 
 import { Address } from './Address';
 
@@ -16,7 +16,7 @@ export interface LoadedResource {
 
 export interface LoadedModule {
   address: Address;
-  program: any[];
+  program: Statement[];
 }
 
 interface VariableValue {
@@ -58,12 +58,12 @@ export class Orchestrator {
   /**
    * Process variable declarations for a specific scope
    */
-  private processVariables(program: ReturnType<Parser['parse']>, scopeAddress: Address): void {
+  private processVariables(program: Statement[], scopeAddress: Address): void {
     const scope = this.getAddressScope(scopeAddress);
     if (!this.variables.has(scope)) this.variables.set(scope, new Map());
     const scopeVars = this.variables.get(scope)!;
 
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Variable') {
         const defaultValue = stmt.attributes.default?.value;
         // Only set default if not already set (e.g. by module inputs)
@@ -73,13 +73,12 @@ export class Orchestrator {
             context: scopeAddress, // Defaults are defined in the module's own scope
           });
       }
-    }
   }
 
-  private async processDataSources(program: any[], state: IState, scopeAddress: Address): Promise<void> {
+  private async processDataSources(program: Statement[], state: IState, scopeAddress: Address): Promise<void> {
     const scope = this.getAddressScope(scopeAddress);
 
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Data') {
         const provider = this.providers.get(stmt.dataSourceType);
         if (!provider) throw new Error(`Provider for data source type "${stmt.dataSourceType}" not registered`);
@@ -97,14 +96,13 @@ export class Orchestrator {
         const dataSourceKey = scope ? `${scope}.${stmt.dataSourceType}.${stmt.name}` : `${stmt.dataSourceType}.${stmt.name}`;
         this.dataSources.set(dataSourceKey, resolvedAttributes);
       }
-    }
   }
 
   /**
    * Recursively loads modules and flattens resources
    */
   async loadModuleTree(
-    program: any[],
+    program: Statement[],
     rootDir: string,
     parentAddress: Address,
     moduleAccumulator: LoadedModule[] = []
@@ -117,7 +115,7 @@ export class Orchestrator {
     // Initialize variables map for this scope
     this.processVariables(program, parentAddress);
 
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Resource') {
         const address = new Address(parentAddress.modulePath, stmt.resourceType, stmt.name);
         resources.push({
@@ -129,13 +127,13 @@ export class Orchestrator {
         // Handle child module
         const moduleName = stmt.name;
         const rawAttributes = stmt.attributes || [];
-        const attributesMap: Record<string, any> = {};
+        const attributesMap: Record<string, unknown> = {};
 
         if (Array.isArray(rawAttributes)) for (const a of rawAttributes) attributesMap[a.name] = a;
         else Object.assign(attributesMap, rawAttributes);
 
-        const sourceAttr = attributesMap['source'];
-        const sourceValue = sourceAttr ? sourceAttr.value : undefined;
+        const sourceAttr = attributesMap.source as { value: unknown } | undefined;
+        const sourceValue = sourceAttr?.value;
 
         if (typeof sourceValue !== 'string') throw new Error(`Module "${moduleName}" is missing a valid "source" attribute.`);
 
@@ -145,7 +143,7 @@ export class Orchestrator {
 
         if (!fs.existsSync(moduleFile)) throw new Error(`Module source not found at: ${moduleFile}`);
 
-        const moduleContent = fs.readFileSync(moduleFile, 'utf-8');
+        const moduleContent = fs.readFileSync(moduleFile, 'utf8');
         const lexer = new Lexer(moduleContent);
         const parser = new Parser(lexer.tokenize());
         const moduleProgram = parser.parse() || [];
@@ -170,7 +168,6 @@ export class Orchestrator {
         const { resources: subResources } = await this.loadModuleTree(Array.isArray(moduleProgram) ? Array.from(moduleProgram) : [], moduleDir, childAddress, moduleAccumulator);
         resources.push(...subResources);
       }
-    }
 
     return { resources, modules: moduleAccumulator };
   }
@@ -192,11 +189,9 @@ export class Orchestrator {
     // 4. Process Data Sources for all modules
     this.dataSources.clear();
     const { modules: loadedModules } = await this.loadModuleTree(Array.isArray(program) ? Array.from(program) : [], rootDir, new Address([], '', ''));
-    for (const mod of loadedModules) {
-      await this.processDataSources(mod.program, currentState, mod.address);
-    }
+    for (const mod of loadedModules) await this.processDataSources(mod.program, currentState, mod.address);
 
-    const virtualProgram: any[] = loadedResources.map((r) => ({
+    const virtualProgram: Statement[] = loadedResources.map((r) => ({
       ...r.block,
       modulePath: r.address.modulePath,
     }));
@@ -226,9 +221,7 @@ export class Orchestrator {
 
     // Process Data Sources
     this.dataSources.clear();
-    for (const mod of loadedModules) {
-      await this.processDataSources(mod.program, currentState, mod.address);
-    }
+    for (const mod of loadedModules) await this.processDataSources(mod.program, currentState, mod.address);
 
     const graph = new Graph<null>();
     for (const { uniqueId } of loadedResources) graph.addNode(uniqueId, null);
@@ -269,11 +262,11 @@ export class Orchestrator {
     return this.processOutputs(safeProgram, currentState, Address.root('', ''));
   }
 
-  private processOutputs(program: any[], state: IState, context: Address): Record<string, unknown> {
+  private processOutputs(program: Statement[], state: IState, context: Address): Record<string, unknown> {
     const outputs: Record<string, unknown> = {};
     const scope = this.getAddressScope(context);
 
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Output') {
         const resolved = this.resolveValue(stmt.value, state, context);
         outputs[stmt.name] = resolved;
@@ -282,7 +275,6 @@ export class Orchestrator {
         if (!this.outputsRegistry.has(scope)) this.outputsRegistry.set(scope, new Map());
         this.outputsRegistry.get(scope)!.set(stmt.name, resolved);
       }
-    }
 
     return outputs;
   }
@@ -308,11 +300,12 @@ export class Orchestrator {
     for (const attr of Object.values(stmt.attributes)) this.addValueDependencies(attr, graph, key, parsedAddress);
   }
 
-  private addValueDependencies(value: any, graph: Graph<null>, dependentKey: string, context: Address): void {
+  private addValueDependencies(value: unknown, graph: Graph<null>, dependentKey: string, context: Address): void {
     if (!value || typeof value !== 'object') return;
 
-    if (value.type === 'Reference') {
-      const refParts = value.value as string[];
+    const typedValue = value as { type: string; value: unknown };
+    if (typedValue.type === 'Reference') {
+      const refParts = typedValue.value as string[];
       if (refParts[0] === 'var') {
         const scope = this.getAddressScope(context);
         const variable = this.variables.get(scope)?.get(refParts[1]);
@@ -330,11 +323,11 @@ export class Orchestrator {
         const depKey = depAddr.toString();
         if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
       }
-    } else if (value.type === 'String') {
-      const exprs = (value.value as string).match(/\${([^}]+)}/g) || [];
+    } else if (typedValue.type === 'String') {
+      const exprs = (typedValue.value as string).match(/\${([^}]+)}/g) || [];
       for (const expr of exprs) {
-        const path = expr.slice(2, -1).trim().split('.');
-        this.addValueDependencies({ type: 'Reference', value: path }, graph, dependentKey, context);
+        const pathParts = expr.slice(2, -1).trim().split('.');
+        this.addValueDependencies({ type: 'Reference', value: pathParts }, graph, dependentKey, context);
       }
     }
   }
@@ -342,7 +335,7 @@ export class Orchestrator {
   private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState, loadedModules: LoadedModule[]): Promise<void> {
     const layers = graph.topologicalSort();
 
-    for (const layer of layers) {
+    for (const layer of layers)
       await Promise.all(
         layer.map(async (key: string) => {
           if (key.includes('.outputs.')) {
@@ -363,7 +356,6 @@ export class Orchestrator {
           await this.executeAction(action, currentState);
         })
       );
-    }
   }
 
   private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
@@ -383,10 +375,12 @@ export class Orchestrator {
         await this.executeDelete(action, provider, currentState);
         break;
       }
-      case 'NO_OP':
+      case 'NO_OP': {
         break;
-      default:
+      }
+      default: {
         throw new Error(`Unknown action type: ${action.type}`);
+      }
     }
   }
 
@@ -421,11 +415,7 @@ export class Orchestrator {
     if (!currentResource) throw new Error(`Resource "${key}" not found in state for update`);
 
     const newAttributes = { ...currentResource.attributes };
-    for (const [k, change] of Object.entries(action.changes)) {
-      if (change.new !== undefined) {
-        newAttributes[k] = change.new;
-      }
-    }
+    for (const [k, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[k] = change.new;
 
     const inputs = this.convertAttributes(newAttributes, currentState, contextAddress);
 
@@ -448,23 +438,23 @@ export class Orchestrator {
 
   private interpolateString(value: string, state: IState, context?: Address): string {
     return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
-      const path = expr.trim().split('.');
-      const resolved = this.resolveReference(path, state, context);
+      const pathParts = expr.trim().split('.');
+      const resolved = this.resolveReference(pathParts, state, context);
       return String(resolved ?? '');
     });
   }
 
-  private resolveReference(path: string[], state: IState, context?: Address): unknown {
-    if (path.length < 2) throw new Error(`Invalid reference path: ${path.join('.')}`);
+  private resolveReference(pathParts: string[], state: IState, context?: Address): unknown {
+    if (pathParts.length < 2) throw new Error(`Invalid reference path: ${pathParts.join('.')}`);
 
-    if (path[0] === 'var') return this.resolveVariableReference(path, state, context);
-    if (path[0] === 'data') return this.resolveDataSourceReference(path, context);
-    if (path[0] === 'module') return this.resolveModuleOutputReference(path, state, context);
-    return this.resolveResourceReference(path, state, context);
+    if (pathParts[0] === 'var') return this.resolveVariableReference(pathParts, state, context);
+    if (pathParts[0] === 'data') return this.resolveDataSourceReference(pathParts, context);
+    if (pathParts[0] === 'module') return this.resolveModuleOutputReference(pathParts, state, context);
+    return this.resolveResourceReference(pathParts, state, context);
   }
 
-  private resolveVariableReference(path: string[], state: IState, context?: Address): unknown {
-    const varName = path[1];
+  private resolveVariableReference(pathParts: string[], state: IState, context?: Address): unknown {
+    const varName = pathParts[1];
     const scope = this.getAddressScope(context);
 
     const scopeVars = this.variables.get(scope);
@@ -474,11 +464,11 @@ export class Orchestrator {
     return this.resolveValue(variable.value, state, variable.context);
   }
 
-  private resolveModuleOutputReference(path: string[], state: IState, context?: Address): unknown {
-    if (path.length < 3) throw new Error(`Module output reference must include output name: ${path.join('.')}`);
+  private resolveModuleOutputReference(pathParts: string[], state: IState, context?: Address): unknown {
+    if (pathParts.length < 3) throw new Error(`Module output reference must include output name: ${pathParts.join('.')}`);
 
-    const moduleName = path[1];
-    const outputName = path[2];
+    const moduleName = pathParts[1];
+    const outputName = pathParts[2];
 
     const currentScope = this.getAddressScope(context);
     const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
@@ -489,12 +479,12 @@ export class Orchestrator {
     return scopeOutputs.get(outputName);
   }
 
-  private resolveDataSourceReference(path: string[], context?: Address): unknown {
-    if (path.length < 4) throw new Error(`Data source reference must include attribute: ${path.join('.')}`);
+  private resolveDataSourceReference(pathParts: string[], context?: Address): unknown {
+    if (pathParts.length < 4) throw new Error(`Data source reference must include attribute: ${pathParts.join('.')}`);
 
-    const dataSourceType = path[1];
-    const dataSourceName = path[2];
-    const attrName = path[3];
+    const dataSourceType = pathParts[1];
+    const dataSourceName = pathParts[2];
+    const attrName = pathParts[3];
 
     const scope = this.getAddressScope(context);
     const dataSourceKey = scope ? `${scope}.${dataSourceType}.${dataSourceName}` : `${dataSourceType}.${dataSourceName}`;
@@ -510,22 +500,20 @@ export class Orchestrator {
     return attrValue;
   }
 
-  private resolveResourceReference(path: string[], state: IState, context?: Address): unknown {
-    if (path.length < 3) throw new Error(`Resource reference must include attribute: ${path.join('.')}`);
+  private resolveResourceReference(pathParts: string[], state: IState, context?: Address): unknown {
+    if (pathParts.length < 3) throw new Error(`Resource reference must include attribute: ${pathParts.join('.')}`);
 
-    const attributeName = path[path.length - 1];
-    const addressParts = path.slice(0, -1);
+    const attributeName = pathParts.at(-1)!;
+    const addressParts = pathParts.slice(0, -1);
 
     try {
-      let address: Address;
-      if (addressParts[0] === 'module') address = Address.parse(addressParts.join('.'));
-      else address = new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
+      const address = addressParts[0] === 'module' ? Address.parse(addressParts.join('.')) : new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
 
       const resourceKey = address.toString();
       const resource = state.resources[resourceKey];
       if (!resource) throw new Error(`Resource "${resourceKey}" not found in state`);
 
-      let attrValue: any = resource.attributes[attributeName];
+      let attrValue: unknown = resource.attributes[attributeName];
       if (attrValue === undefined && attributeName === 'id') attrValue = resource.id;
 
       if (attrValue === undefined) throw new Error(`Attribute "${attributeName}" not found on resource "${resourceKey}"`);
@@ -533,8 +521,8 @@ export class Orchestrator {
       if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
 
       return attrValue;
-    } catch (e) {
-      throw new Error(`Invalid resource reference "${path.join('.')}": ${(e as Error).message}`);
+    } catch (error) {
+      throw new Error(`Invalid resource reference "${pathParts.join('.')}": ${(error as Error).message}`);
     }
   }
 

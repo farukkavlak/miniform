@@ -1,8 +1,8 @@
 // Import plan to spy on it
 import { plan } from '@miniform/planner';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { Orchestrator } from '../src/index';
 
@@ -12,6 +12,7 @@ vi.mock('node:path');
 
 // Mock StateManager
 const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, version: 1 });
+// eslint-disable-next-line unicorn/no-useless-undefined
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => {
@@ -29,7 +30,15 @@ vi.mock('@miniform/planner', () => ({
 
 describe('Orchestrator - Module Loading', () => {
   let orchestrator: Orchestrator;
-  let mockProvider: any;
+  let mockProvider: {
+    resources: string[];
+    validate: Mock;
+    create: Mock;
+    read: Mock;
+    update: Mock;
+    delete: Mock;
+    getSchema: Mock;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,11 +58,11 @@ describe('Orchestrator - Module Loading', () => {
     orchestrator.registerProvider(mockProvider);
 
     // Mock path.resolve
-    (path.resolve as any).mockImplementation((...args: string[]) => args.join('/'));
-    (path.join as any).mockImplementation((...args: string[]) => args.join('/'));
+    (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
+    (path.join as Mock).mockImplementation((...args: string[]) => args.join('/'));
 
     // Ensure plan returns empty array
-    (plan as any).mockReturnValue([]);
+    (plan as Mock).mockReturnValue([]);
   });
 
   it('should recursively load modules and flatten resources', async () => {
@@ -70,14 +79,14 @@ describe('Orchestrator - Module Loading', () => {
         `;
 
     // Mock FS Sync for Module Loading
-    (fs.existsSync as any).mockReturnValue(true);
-    (fs.readFileSync as any).mockImplementation((filePath: string) => {
+    (fs.existsSync as Mock).mockReturnValue(true);
+    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
       if (filePath.includes('modules/vpc/main.mf')) return vpcConfig;
       return '';
     });
 
     // Mock Plan to return expected actions
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',
@@ -104,8 +113,8 @@ describe('Orchestrator - Module Loading', () => {
     const appConfig = `module "db" { source = "./db" }`;
     const dbConfig = `resource "test_resource" "rds" {}`;
 
-    (fs.existsSync as any).mockReturnValue(true);
-    (fs.readFileSync as any).mockImplementation((filePath: string) => {
+    (fs.existsSync as Mock).mockReturnValue(true);
+    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
       if (filePath.endsWith('app/main.mf')) return appConfig;
       if (filePath.endsWith('db/main.mf')) return dbConfig;
       // The orchestrator re-reads the root config for execution, so we need to return it
@@ -116,7 +125,7 @@ describe('Orchestrator - Module Loading', () => {
     writeMock.mockClear();
 
     // Mock Plan to return expected actions for nested module
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',
@@ -145,8 +154,8 @@ describe('Orchestrator - Module Loading', () => {
     const config4 = `module "L5" { source = "./L5" }`;
     const config5 = `resource "test_resource" "deep" {}`;
 
-    (fs.existsSync as any).mockReturnValue(true);
-    (fs.readFileSync as any).mockImplementation((filePath: string) => {
+    (fs.existsSync as Mock).mockReturnValue(true);
+    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
       if (filePath.endsWith('L2/main.mf')) return config2;
       if (filePath.endsWith('L3/main.mf')) return config3;
       if (filePath.endsWith('L4/main.mf')) return config4;
@@ -157,7 +166,7 @@ describe('Orchestrator - Module Loading', () => {
     // Reset mock calls
     writeMock.mockClear();
     // Mock Plan to return expected actions
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',

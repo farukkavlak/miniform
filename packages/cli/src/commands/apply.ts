@@ -117,8 +117,8 @@ export function createApplyCommand() {
       try {
         // Check if argument is a plan file (must be a string that doesn't start with -)
         if (planFileArg && !planFileArg.startsWith('-')) {
-          const planContent = await fs.readFile(planFileArg, 'utf8');
-          const planData = JSON.parse(planContent);
+          const planContent = await fs.readFile(planFileArg);
+          const planData = JSON.parse(planContent.toString('utf8'));
 
           if (!validatePlanFile(planData)) {
             console.error(chalk.red('Error: Invalid plan file format.'));

@@ -56,7 +56,6 @@ describe('Address', () => {
     });
 
     it('should create child address with parent', () => {
-      const child = new Address(['db'], 'res', 'name');
       // parent is "app"
       // final: module.app.module.db.res.name
       // Wait, withParent adds to the BEGINNING?

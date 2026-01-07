@@ -1,9 +1,9 @@
 /* eslint-disable camelcase */
 // Import plan to spy on it
 import { plan } from '@miniform/planner';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { Orchestrator } from '../src/index';
 
@@ -13,6 +13,7 @@ vi.mock('node:path');
 
 // Mock StateManager
 const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, version: 1 });
+// eslint-disable-next-line unicorn/no-useless-undefined
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => {
@@ -30,7 +31,15 @@ vi.mock('@miniform/planner', () => ({
 
 describe('Orchestrator - Phase 4: Data Flow', () => {
   let orchestrator: Orchestrator;
-  let mockProvider: any;
+  let mockProvider: {
+    resources: string[];
+    validate: Mock;
+    create: Mock;
+    read: Mock;
+    update: Mock;
+    delete: Mock;
+    getSchema: Mock;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,11 +59,11 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
     orchestrator.registerProvider(mockProvider);
 
     // Mock path.resolve
-    (path.resolve as any).mockImplementation((...args: string[]) => args.join('/'));
-    (path.join as any).mockImplementation((...args: string[]) => args.join('/'));
+    (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
+    (path.join as Mock).mockImplementation((...args: string[]) => args.join('/'));
 
     // Ensure plan returns empty array by default
-    (plan as any).mockReturnValue([]);
+    (plan as Mock).mockReturnValue([]);
   });
 
   it('should use default variable value in root scope', async () => {
@@ -69,7 +78,7 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
         `;
 
     // Mock Plan to return action
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',
@@ -79,7 +88,7 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
       },
     ]);
 
-    (fs.existsSync as any).mockReturnValue(true);
+    (fs.existsSync as Mock).mockReturnValue(true);
 
     await orchestrator.apply(config, '/root');
 
@@ -111,15 +120,15 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
             }
         `;
 
-    (fs.existsSync as any).mockReturnValue(true);
-    (fs.readFileSync as any).mockImplementation((filePath: string) => {
+    (fs.existsSync as Mock).mockReturnValue(true);
+    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
       if (filePath.endsWith('app/main.mf')) return appConfig;
       if (filePath.includes('root')) return rootConfig;
       return rootConfig;
     });
 
     // Mock Plan
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',
@@ -154,14 +163,14 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
             }
         `;
 
-    (fs.existsSync as any).mockReturnValue(true);
-    (fs.readFileSync as any).mockImplementation((filePath: string) => {
+    (fs.existsSync as Mock).mockReturnValue(true);
+    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
       if (filePath.endsWith('L2/main.mf')) return l2Config;
       return rootConfig;
     });
 
     // Mock Plan
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',
@@ -182,7 +191,7 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
     expect(stateArg.variables['module.L2']).toBeDefined();
     // In current implementation, we store raw values in state for variables
     const varEntry = stateArg.variables['module.L2'].region;
-    const innerVal = (varEntry as any).value || varEntry;
+    const innerVal = (varEntry as { value: unknown }).value || varEntry;
     expect(innerVal).toBe('eu-west-1');
   });
 
@@ -204,14 +213,14 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
             }
         `;
 
-    (fs.existsSync as any).mockReturnValue(true);
-    (fs.readFileSync as any).mockImplementation((filePath: string) => {
+    (fs.existsSync as Mock).mockReturnValue(true);
+    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
       if (filePath.endsWith('db/main.mf')) return dbConfig;
       return rootConfig;
     });
 
     // Mock Plan
-    (plan as any).mockReturnValue([
+    (plan as Mock).mockReturnValue([
       {
         type: 'CREATE',
         resourceType: 'test_resource',
@@ -229,7 +238,7 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
     ]);
 
     // Mock provider behavior to simulate resource ID generation
-    mockProvider.create.mockImplementation((type: string, inputs: any) => {
+    mockProvider.create.mockImplementation((type: string, inputs: Record<string, unknown>) => {
       if (inputs.name === 'sql-server') return 'db-123';
       return 'app-456';
     });

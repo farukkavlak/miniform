@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import { Orchestrator } from '@miniform/orchestrator';
 import fs from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
