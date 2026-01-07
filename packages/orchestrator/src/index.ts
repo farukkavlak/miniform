@@ -1,6 +1,6 @@
 import { IProvider, ISchema } from '@miniform/contracts';
 import { Graph } from '@miniform/graph';
-import { Lexer, Parser } from '@miniform/parser';
+import { Lexer, Parser, ResourceBlock } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
 
@@ -94,16 +94,7 @@ export class Orchestrator {
       }
 
     // Add edges for resource references (dependencies)
-    for (const stmt of program)
-      if (stmt.type === 'Resource') {
-        const key = `${stmt.resourceType}.${stmt.name}`;
-        for (const attr of Object.values(stmt.attributes))
-          if (attr.type === 'Reference' && attr.value[0] !== 'var') {
-            // Resource reference: [type, name, attr]
-            const depKey = `${attr.value[0]}.${attr.value[1]}`;
-            if (graph.hasNode(depKey)) graph.addEdge(depKey, key); // depKey -> key means key depends on depKey
-          }
-      }
+    for (const stmt of program) if (stmt.type === 'Resource') this.addResourceDependencies(stmt, graph);
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
 
@@ -119,6 +110,15 @@ export class Orchestrator {
 
     // 8. Write final state after all operations
     await this.stateManager.write(currentState);
+  }
+
+  private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>): void {
+    const key = `${stmt.resourceType}.${stmt.name}`;
+    for (const attr of Object.values(stmt.attributes))
+      if (attr.type === 'Reference' && attr.value[0] !== 'var') {
+        const depKey = `${attr.value[0]}.${attr.value[1]}`;
+        if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
+      }
   }
 
   private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState): Promise<void> {
@@ -175,6 +175,7 @@ export class Orchestrator {
 
     const id = await provider.create(action.resourceType, inputs);
 
+    // eslint-disable-next-line require-atomic-updates
     currentState.resources[`${action.resourceType}.${action.name}`] = {
       id,
       type: 'Resource',
@@ -227,7 +228,8 @@ export class Orchestrator {
    * Interpolate ${...} expressions in a string
    */
   private interpolateString(value: string, state: IState): string {
-    return value.replace(/\$\{([^}]+)\}/g, (_, expr) => {
+    // eslint-disable-next-line unicorn/prefer-string-replace-all
+    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
       const path = expr.trim().split('.');
       const resolved = this.resolveReference(path, state);
       return String(resolved ?? '');
