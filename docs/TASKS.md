@@ -178,13 +178,13 @@
 ### 8.2. Plan Command
 
 - [x] **`miniform plan` Command**
-  - [x] Show what will change without applying
-  - [x] Color-coded output (+ create, ~ update, - delete)
+  - [x] Show changes
+  - [x] Colored output (+, ~, -)
   - [x] Resource count summary
-- [ ] **Plan File Support**
-  - [ ] Save plan to file
-  - [ ] Apply from saved plan
-  - [ ] Plan validation
+- [x] **Plan File Support**
+  - [x] Save plan to file (`-out` flag)
+  - [x] Apply from saved plan (`miniform apply [plan-file]`)
+  - [x] Plan validation and hash check
 
 ### 8.3. Output Values
 
