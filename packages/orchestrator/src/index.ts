@@ -3,8 +3,16 @@ import { Graph } from '@miniform/graph';
 import { Lexer, Parser, ResourceBlock } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 import { Address } from './Address';
+
+export interface LoadedResource {
+  uniqueId: string; // "module.vpc.aws_subnet.private"
+  address: Address;
+  block: ResourceBlock;
+}
 
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
@@ -69,6 +77,69 @@ export class Orchestrator {
   }
 
   /**
+   * Recursively loads modules and flattens resources
+   */
+  async loadModuleTree(
+    program: ReturnType<Parser['parse']>,
+    rootDir: string,
+    parentAddress: Address
+  ): Promise<LoadedResource[]> {
+    const resources: LoadedResource[] = [];
+
+    for (const stmt of program) {
+      if (stmt.type === 'Resource') {
+        const address = new Address(parentAddress.modulePath, stmt.resourceType, stmt.name);
+        resources.push({
+          uniqueId: address.toString(),
+          address,
+          block: stmt,
+        });
+      } else if (stmt.type === 'Module') {
+        // Handle child module
+        const moduleName = stmt.name;
+        // Create a proper attributes array for find or lookup in object
+        let sourceValue: any;
+
+        if (Array.isArray(stmt.attributes)) {
+          const attr = stmt.attributes.find((a: any) => a.name === 'source');
+          sourceValue = attr ? attr.value : undefined;
+        } else {
+          // For resource blocks parser returns object map `attributes: { key: Value }`
+          // Check if parser behaves same for Module
+          const sourceAttr = stmt.attributes['source'];
+          sourceValue = sourceAttr ? sourceAttr.value : undefined;
+        }
+
+        if (typeof sourceValue !== 'string') {
+          throw new Error(`Module "${moduleName}" is missing a valid "source" attribute.`);
+        }
+
+        const sourcePath = sourceValue;
+        const moduleDir = path.resolve(rootDir, sourcePath);
+        const moduleFile = path.join(moduleDir, 'main.mf');
+
+        if (!fs.existsSync(moduleFile)) {
+          throw new Error(`Module source not found at: ${moduleFile}`);
+        }
+
+        const moduleContent = fs.readFileSync(moduleFile, 'utf-8');
+        const lexer = new Lexer(moduleContent);
+        const parser = new Parser(lexer.tokenize());
+        const moduleProgram = parser.parse() || [];
+
+        const subResources = await this.loadModuleTree(
+          Array.isArray(moduleProgram) ? Array.from(moduleProgram) : [],
+          moduleDir,
+          new Address([...parentAddress.modulePath, moduleName], '', '')
+        );
+        resources.push(...subResources);
+      }
+    }
+
+    return resources;
+  }
+
+  /**
    * Generate an execution plan without applying it
    */
   async plan(configContent: string): Promise<PlanAction[]> {
@@ -101,28 +172,35 @@ export class Orchestrator {
   /**
    * Execute a configuration file
    */
-  async apply(configContent: string): Promise<Record<string, unknown>> {
+  async apply(configContent: string, rootDir: string = process.cwd()): Promise<Record<string, unknown>> {
     // 1. Generate plan
     const allActions = await this.plan(configContent);
 
     // 2. Load current state (needed for graph building and execution)
     const currentState = await this.stateManager.read();
 
-    // 3. Parse config again to build graph
+    // 3. Load all modules recursively and flatten resources
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
-    const program = parser.parse();
+    const mainProgram = parser.parse() || [];
+
+    // Safety check for mainProgram
+    const safeProgram = Array.isArray(mainProgram) ? Array.from(mainProgram) : [];
+
+    const loadedResources = await this.loadModuleTree(safeProgram, rootDir, new Address([], '', ''));
 
     // 4. Build dependency graph with edges from resource references
     const graph = new Graph<null>();
-    for (const stmt of program)
-      if (stmt.type === 'Resource') {
-        const key = Address.root(stmt.resourceType, stmt.name).toString();
-        graph.addNode(key, null);
-      }
+
+    // Add all nodes
+    for (const { uniqueId } of loadedResources) {
+      graph.addNode(uniqueId, null);
+    }
 
     // Add edges for resource references (dependencies)
-    for (const stmt of program) if (stmt.type === 'Resource') this.addResourceDependencies(stmt, graph);
+    for (const { address, block } of loadedResources) {
+      this.addResourceDependencies(block, graph, address);
+    }
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
 
@@ -134,13 +212,14 @@ export class Orchestrator {
     for (const action of deleteActions) await this.executeAction(action, currentState);
 
     // 7. Add variables to state
+    if (!currentState.variables) currentState.variables = {};
     currentState.variables = Object.fromEntries(this.variables);
 
     // 8. Write final state after all operations
     await this.stateManager.write(currentState);
 
     // 9. Process and return outputs
-    return this.processOutputs(program, currentState);
+    return this.processOutputs(safeProgram, currentState);
   }
 
   private processOutputs(program: ReturnType<Parser['parse']>, state: IState): Record<string, unknown> {
@@ -160,11 +239,23 @@ export class Orchestrator {
     return value.value;
   }
 
-  private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>): void {
-    const key = `${stmt.resourceType}.${stmt.name}`;
+  private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>, parsedAddress: Address): void {
+    const key = parsedAddress.toString();
     for (const attr of Object.values(stmt.attributes))
       if (attr.type === 'Reference' && attr.value[0] !== 'var') {
-        const depKey = `${attr.value[0]}.${attr.value[1]}`;
+        const refParts = attr.value as string[];
+        let depKey = "";
+
+        if (refParts[0] === 'module') {
+          // Module ref (module.child.x)
+          const depString = refParts.slice(0, -1).join('.');
+          depKey = depString;
+        } else {
+          // Local ref
+          const depAddr = new Address(parsedAddress.modulePath, refParts[0], refParts[1]);
+          depKey = depAddr.toString();
+        }
+
         if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
       }
   }
