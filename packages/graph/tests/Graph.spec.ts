@@ -62,6 +62,45 @@ describe('Graph', () => {
     expect(() => graph.topologicalSort()).toThrow(/Cycle/);
   });
 
+  it('should detect self-reference cycle', () => {
+    // A -> A
+    const graph = new Graph<string>();
+    graph.addNode('A', 'val');
+    graph.addEdge('A', 'A');
+
+    expect(() => graph.topologicalSort()).toThrow(/Cycle/);
+  });
+
+  it('should detect multi-node cycle', () => {
+    // A -> B -> C -> A
+    const graph = new Graph<string>();
+    graph.addNode('A', 'val');
+    graph.addNode('B', 'val');
+    graph.addNode('C', 'val');
+    graph.addEdge('A', 'B');
+    graph.addEdge('B', 'C');
+    graph.addEdge('C', 'A');
+
+    expect(() => graph.topologicalSort()).toThrow(/Cycle/);
+  });
+
+  it('should detect cycle in complex graph', () => {
+    // A -> B -> D
+    // A -> C -> D (cycle: D -> B)
+    const graph = new Graph<string>();
+    graph.addNode('A', 'val');
+    graph.addNode('B', 'val');
+    graph.addNode('C', 'val');
+    graph.addNode('D', 'val');
+    graph.addEdge('A', 'B');
+    graph.addEdge('A', 'C');
+    graph.addEdge('B', 'D');
+    graph.addEdge('C', 'D');
+    graph.addEdge('D', 'B'); // Creates cycle
+
+    expect(() => graph.topologicalSort()).toThrow(/Cycle/);
+  });
+
   it('should sort nodes batch-wise (parallel)', () => {
     // A -> C
     // B -> C

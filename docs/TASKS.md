@@ -39,7 +39,7 @@
   - [x] Parallel Execution (Layer-based)
   - [x] State Management (Atomic writes)
   - [x] Comprehensive Tests (16 tests, 100% statement coverage)
-- [ ] **Integration Tests:** Verify simple apply/plan cycles
+- [x] **Integration Tests:** Verify simple apply/plan cycles
   - [x] Implement Schema Validation (Runtime type checking)
   - [x] Implement DAG & Topological Sort (No deps)
   - [x] Implement Parallel Execution (Batch-wise layers)
@@ -48,7 +48,6 @@
   - [x] Implement Variables Support (`var.name` references)
   - [x] Implement Diff Engine (Plan logic)
   - [x] Implement Orchestrator (Runner)
-- [ ] **Integration Tests:** Verify simple apply/plan cycles
 
 ## 4. Providers & Resource Coverage
 
@@ -163,25 +162,25 @@
 
 ### 9.1. Reference Resolution & Dependencies
 
-- [ ] **Reference Resolution in Planner**
-  - [ ] Resolve `local_file.config.path` to actual values
-  - [ ] Resolve `var.region` to variable values
-  - [ ] Detect circular references
-- [ ] **Dependency Detection from References**
-  - [ ] Parse references in attribute values
-  - [ ] Add graph edges based on references
-  - [ ] Validate dependency chains
-- [ ] **String Interpolation**
-  - [ ] Lexer support for `${...}` syntax
-  - [ ] Parser support for template strings
-  - [ ] Runtime interpolation in Orchestrator
+- [x] **Reference Resolution in Planner**
+  - [x] Resolve `local_file.config.path` to actual values
+  - [x] Resolve `var.region` to variable values
+  - [x] Detect circular references
+- [x] **Dependency Detection from References**
+  - [x] Parse references in attribute values
+  - [x] Add graph edges based on references
+  - [x] Validate dependency chains
+- [x] **String Interpolation**
+  - [x] Lexer support for `${...}` syntax
+  - [x] Parser support for template strings
+  - [x] Runtime interpolation in Orchestrator
 
 ### 8.2. Plan Command
 
-- [ ] **`miniform plan` Command**
-  - [ ] Show what will change without applying
-  - [ ] Color-coded output (+ create, ~ update, - delete)
-  - [ ] Resource count summary
+- [x] **`miniform plan` Command**
+  - [x] Show what will change without applying
+  - [x] Color-coded output (+ create, ~ update, - delete)
+  - [x] Resource count summary
 - [ ] **Plan File Support**
   - [ ] Save plan to file
   - [ ] Apply from saved plan
@@ -189,18 +188,18 @@
 
 ### 8.3. Output Values
 
-- [ ] **Output Block Parsing**
-  - [ ] Parse `output "name" { value = ... }` syntax
-  - [ ] Store outputs in state
-- [ ] **Output Display**
-  - [ ] Show outputs after apply
+- [x] **Output Block Parsing**
+  - [x] Parse `output "name" { value = ... }` syntax
+  - [x] Store outputs in state
+- [x] **Output Display**
+  - [x] Show outputs after apply
   - [ ] `miniform output` command
   - [ ] JSON output format
 
 ### 8.4. Better Error Messages
 
-- [ ] **Contextual Errors**
-  - [ ] Show file/line/column in config
+- [x] **Contextual Errors**
+  - [x] Show file/line/column in config
   - [ ] Highlight problematic code
   - [ ] Suggest fixes ("did you mean?")
 - [ ] **Provider Errors**
@@ -214,12 +213,12 @@
 
 ### 9.1. Data Sources
 
-- [ ] **Data Source Parsing**
+- [x] **Data Source Parsing**
   - [x] `data "type" "name" {}` syntax
-  - [ ] Data source provider interface
-- [ ] **Read-Only Operations**
-  - [ ] Query existing resources
-  - [ ] Use in other resources
+  - [x] Data source provider interface (`read()` method in IProvider)
+- [x] **Read-Only Operations**
+  - [x] Query existing resources (via provider.read())
+  - [x] Use in other resources (via `data.type.name.attribute` references)
 
 ### 9.2. State Management Commands
 

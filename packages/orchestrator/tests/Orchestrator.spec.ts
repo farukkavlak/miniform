@@ -579,4 +579,45 @@ describe('Orchestrator', () => {
       expect(outputs).toEqual({});
     });
   });
+
+  describe('Circular Dependency Detection', () => {
+    it('should detect direct circular dependency between resources', async () => {
+      const config = `
+        resource "mock_resource" "a" {
+          ref = mock_resource.b.name
+        }
+        resource "mock_resource" "b" {
+          ref = mock_resource.a.name
+        }
+      `;
+
+      await expect(orchestrator.apply(config)).rejects.toThrow(/Cycle/);
+    });
+
+    it('should detect indirect circular dependency (A -> B -> C -> A)', async () => {
+      const config = `
+        resource "mock_resource" "a" {
+          ref = mock_resource.b.name
+        }
+        resource "mock_resource" "b" {
+          ref = mock_resource.c.name
+        }
+        resource "mock_resource" "c" {
+          ref = mock_resource.a.name
+        }
+      `;
+
+      await expect(orchestrator.apply(config)).rejects.toThrow(/Cycle/);
+    });
+
+    it('should detect self-reference circular dependency', async () => {
+      const config = `
+        resource "mock_resource" "self" {
+          ref = mock_resource.self.name
+        }
+      `;
+
+      await expect(orchestrator.apply(config)).rejects.toThrow(/Cycle/);
+    });
+  });
 });
