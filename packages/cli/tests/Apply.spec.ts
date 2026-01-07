@@ -48,7 +48,7 @@ describe('CLI: apply command', () => {
       { type: 'DELETE', resourceType: 'test', name: 't3' },
       { type: 'NO_OP', resourceType: 'test', name: 't4' },
     ]);
-    const applyMock = vi.fn().mockResolvedValue(void 0);
+    const applyMock = vi.fn().mockResolvedValue({});
 
     vi.mocked(Orchestrator).mockImplementation(function () {
       return {
@@ -72,7 +72,7 @@ describe('CLI: apply command', () => {
     vi.mocked(fs.readFile).mockResolvedValue('content');
 
     const planMock = vi.fn().mockResolvedValue([{ type: 'CREATE', resourceType: 'test', name: 't' }]);
-    const applyMock = vi.fn().mockResolvedValue(void 0);
+    const applyMock = vi.fn().mockResolvedValue({});
 
     vi.mocked(Orchestrator).mockImplementation(function () {
       return {
@@ -93,7 +93,7 @@ describe('CLI: apply command', () => {
     vi.mocked(fs.readFile).mockResolvedValue('content');
 
     const planMock = vi.fn().mockResolvedValue([{ type: 'CREATE', resourceType: 'test', name: 't' }]);
-    const applyMock = vi.fn().mockResolvedValue(void 0);
+    const applyMock = vi.fn().mockResolvedValue({});
 
     vi.mocked(Orchestrator).mockImplementation(function () {
       return {
@@ -171,7 +171,7 @@ describe('CLI: apply command', () => {
     vi.mocked(fs.readFile).mockResolvedValue('content');
 
     const planMock = vi.fn().mockResolvedValue([{ type: 'UNKNOWN', resourceType: 'test', name: 't' }]);
-    const applyMock = vi.fn().mockResolvedValue(void 0);
+    const applyMock = vi.fn().mockResolvedValue({});
 
     vi.mocked(Orchestrator).mockImplementation(function () {
       return {
