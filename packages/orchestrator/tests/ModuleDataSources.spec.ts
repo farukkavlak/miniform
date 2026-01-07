@@ -10,7 +10,6 @@ import { Orchestrator } from '../src/index';
 vi.mock('node:fs');
 
 const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, version: 1 });
-// eslint-disable-next-line unicorn/no-useless-undefined
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => ({
