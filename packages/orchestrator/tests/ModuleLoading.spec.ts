@@ -1,14 +1,13 @@
-// Import plan to spy on it
 import { plan } from '@miniform/planner';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { Orchestrator } from '../src/index';
 
-// Mock fs and path
 vi.mock('node:fs');
-vi.mock('node:path');
 
 const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, version: 1 });
 const writeMock = vi.fn().mockResolvedValue(undefined);
@@ -34,6 +33,7 @@ vi.mock('@miniform/planner', () => ({
 }));
 
 describe('Orchestrator - Module Loading', () => {
+  let tmpDir: string;
   let orchestrator: Orchestrator;
   let mockProvider: {
     resources: string[];
@@ -45,10 +45,10 @@ describe('Orchestrator - Module Loading', () => {
     getSchema: Mock;
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'orchestrator-module-test-'));
 
-    // Setup mock provider
     mockProvider = {
       resources: ['test_resource'],
       validate: vi.fn(),
@@ -59,20 +59,21 @@ describe('Orchestrator - Module Loading', () => {
       getSchema: vi.fn().mockReturnValue({}),
     };
 
-    // Mock classes are already imported via vi.mock
-    // eslint-disable-next-line unicorn/prefer-module
-    const { StateManager, LocalBackend } = require('@miniform/state');
-    const backend = new LocalBackend();
+    const { StateManager, LocalBackend } = await import('@miniform/state');
+    const backend = new LocalBackend(tmpDir);
     const stateManager = new StateManager(backend);
     orchestrator = new Orchestrator(stateManager);
     orchestrator.registerProvider(mockProvider);
 
-    // Mock path.resolve
+    // Mock path.resolve for module loading
     (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
-    (path.join as Mock).mockImplementation((...args: string[]) => args.join('/'));
 
     // Ensure plan returns empty array
     (plan as Mock).mockReturnValue([]);
+  });
+
+  afterEach(async () => {
+    if (tmpDir) await fsPromises.rm(tmpDir, { recursive: true, force: true });
   });
 
   it('should recursively load modules and flatten resources', async () => {
