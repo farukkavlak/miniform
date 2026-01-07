@@ -38,6 +38,11 @@ class MockProvider implements IProvider {
     this.createdResources.delete(id);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async read(_type: string, _inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
+    return {};
+  }
+
   getCreatedResources(): Map<string, Record<string, unknown>> {
     return this.createdResources;
   }
