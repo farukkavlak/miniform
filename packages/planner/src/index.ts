@@ -9,6 +9,7 @@ export interface PlanAction {
   type: ActionType;
   resourceType: string;
   name: string;
+  modulePath?: string[]; // Path of modules leading to this resource
   id?: string;
   attributes?: Record<string, AttributeValue>;
   changes?: Record<string, { old: AttributeValue | undefined; new: AttributeValue | undefined }>;
@@ -17,7 +18,7 @@ export interface PlanAction {
 export interface PlanFile {
   version: string;
   timestamp: string;
-  config_hash: string;
+  configHash: string;
   actions: PlanAction[];
 }
 
@@ -27,7 +28,7 @@ export function serializePlan(actions: PlanAction[], configContent: string): Pla
   return {
     version: '1.0',
     timestamp: new Date().toISOString(),
-    config_hash: hash,
+    configHash: hash,
     actions,
   };
 }
@@ -36,7 +37,7 @@ export function validatePlanFile(planFile: unknown): planFile is PlanFile {
   if (!planFile || typeof planFile !== 'object') return false;
 
   const pf = planFile as Partial<PlanFile>;
-  return typeof pf.version === 'string' && typeof pf.timestamp === 'string' && typeof pf.config_hash === 'string' && Array.isArray(pf.actions);
+  return typeof pf.version === 'string' && typeof pf.timestamp === 'string' && typeof pf.configHash === 'string' && Array.isArray(pf.actions);
 }
 
 function calculateDiff(
@@ -61,6 +62,12 @@ function calculateDiff(
   return hasChanges ? changes : null;
 }
 
+function getResourceKey(resource: ResourceBlock): string {
+  const prefix = (resource.modulePath || []).map((m: string) => `module.${m}`).join('.');
+  const suffix = `${resource.resourceType}.${resource.name}`;
+  return prefix ? `${prefix}.${suffix}` : suffix;
+}
+
 function processExistingResource(actions: PlanAction[], resource: ResourceBlock, currentResource: IResource, schemas: Record<string, ISchema>) {
   const changes = calculateDiff(currentResource.attributes as Record<string, AttributeValue>, resource.attributes);
 
@@ -69,6 +76,7 @@ function processExistingResource(actions: PlanAction[], resource: ResourceBlock,
       type: 'NO_OP',
       resourceType: resource.resourceType,
       name: resource.name,
+      modulePath: resource.modulePath,
       id: currentResource.id,
     });
     return;
@@ -83,12 +91,14 @@ function processExistingResource(actions: PlanAction[], resource: ResourceBlock,
         type: 'DELETE',
         resourceType: resource.resourceType,
         name: resource.name,
+        modulePath: resource.modulePath,
         id: currentResource.id,
       },
       {
         type: 'CREATE',
         resourceType: resource.resourceType,
         name: resource.name,
+        modulePath: resource.modulePath,
         attributes: resource.attributes,
       }
     );
@@ -97,6 +107,7 @@ function processExistingResource(actions: PlanAction[], resource: ResourceBlock,
       type: 'UPDATE',
       resourceType: resource.resourceType,
       name: resource.name,
+      modulePath: resource.modulePath,
       id: currentResource.id,
       changes,
     });
@@ -110,7 +121,7 @@ export function plan(desiredState: Program, currentState: IState, schemas: Recor
   // Map desired resources for easier lookup
   for (const stmt of desiredState)
     if (stmt.type === 'Resource') {
-      const key = `${stmt.resourceType}.${stmt.name}`;
+      const key = getResourceKey(stmt);
       desiredMap.set(key, stmt);
     }
 
@@ -123,6 +134,7 @@ export function plan(desiredState: Program, currentState: IState, schemas: Recor
         type: 'CREATE',
         resourceType: resource.resourceType,
         name: resource.name,
+        modulePath: resource.modulePath,
         attributes: resource.attributes,
       });
   }
@@ -136,6 +148,7 @@ export function plan(desiredState: Program, currentState: IState, schemas: Recor
         type: 'DELETE',
         resourceType: resource.resourceType,
         name: resource.name,
+        modulePath: resource.modulePath,
         id: resource.id,
       });
   }

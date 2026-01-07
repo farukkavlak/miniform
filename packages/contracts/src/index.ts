@@ -4,6 +4,7 @@ export interface IResource {
   type: string;
   resourceType: string;
   name: string;
+  modulePath?: string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   attributes: Record<string, any>;
 }

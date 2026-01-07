@@ -22,7 +22,7 @@ vi.mock('@miniform/planner', async () => {
     serializePlan: vi.fn(() => ({
       version: '1.0',
       timestamp: 'mock-time',
-      config_hash: 'mock-hash',
+      configHash: 'mock-hash',
       actions: [],
     })),
   };
