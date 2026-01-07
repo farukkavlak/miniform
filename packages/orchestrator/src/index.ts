@@ -72,7 +72,7 @@ export class Orchestrator {
         if (!scopeVars.has(stmt.name)) {
           scopeVars.set(stmt.name, {
             value: defaultValue,
-            context: scopeAddress // Defaults are defined in the module's own scope
+            context: scopeAddress, // Defaults are defined in the module's own scope
           });
         }
       }
@@ -174,16 +174,11 @@ export class Orchestrator {
           if (key === 'source') continue;
           childVars.set(key, {
             value: attr,
-            context: parentAddress // Defined in PARENT scope
+            context: parentAddress, // Defined in PARENT scope
           });
         }
 
-        const { resources: subResources } = await this.loadModuleTree(
-          Array.isArray(moduleProgram) ? Array.from(moduleProgram) : [],
-          moduleDir,
-          childAddress,
-          moduleAccumulator
-        );
+        const { resources: subResources } = await this.loadModuleTree(Array.isArray(moduleProgram) ? Array.from(moduleProgram) : [], moduleDir, childAddress, moduleAccumulator);
         resources.push(...subResources);
       }
     }
@@ -201,11 +196,7 @@ export class Orchestrator {
 
     this.variables.clear();
 
-    const { resources: loadedResources } = await this.loadModuleTree(
-      Array.isArray(program) ? Array.from(program) : [],
-      rootDir,
-      new Address([], '', '')
-    );
+    const { resources: loadedResources } = await this.loadModuleTree(Array.isArray(program) ? Array.from(program) : [], rootDir, new Address([], '', ''));
 
     const currentState = await this.stateManager.read();
 
@@ -216,10 +207,9 @@ export class Orchestrator {
       await this.processDataSources(mod.program, currentState, mod.address);
     }
 
-    const virtualProgram: any[] = loadedResources.map(r => ({
+    const virtualProgram: any[] = loadedResources.map((r) => ({
       ...r.block,
-      name: r.uniqueId,
-      modulePath: r.address.modulePath
+      modulePath: r.address.modulePath,
     }));
 
     const schemas: Record<string, ISchema> = {};
@@ -245,6 +235,12 @@ export class Orchestrator {
     const safeProgram = Array.isArray(mainProgram) ? Array.from(mainProgram) : [];
 
     const { resources: loadedResources, modules: loadedModules } = await this.loadModuleTree(safeProgram, rootDir, new Address([], '', ''));
+
+    // Process Data Sources
+    this.dataSources.clear();
+    for (const mod of loadedModules) {
+      await this.processDataSources(mod.program, currentState, mod.address);
+    }
 
     const graph = new Graph<null>();
     for (const { uniqueId } of loadedResources) {
@@ -324,8 +320,7 @@ export class Orchestrator {
 
   private convertAttributes(attributes: Record<string, unknown>, state: IState, context?: Address): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(attributes))
-      result[key] = this.resolveValue(value, state, context);
+    for (const [key, value] of Object.entries(attributes)) result[key] = this.resolveValue(value, state, context);
     return result;
   }
 
@@ -378,7 +373,7 @@ export class Orchestrator {
           if (key.includes('.outputs.')) {
             const parts = key.split('.outputs.');
             const scope = parts[0];
-            const mod = loadedModules.find(m => this.getAddressScope(m.address) === scope);
+            const mod = loadedModules.find((m) => this.getAddressScope(m.address) === scope);
             if (mod) {
               this.processOutputs(mod.program, currentState, mod.address);
             }
@@ -415,55 +410,50 @@ export class Orchestrator {
         await this.executeDelete(action, provider, currentState);
         break;
       }
-      case 'NO_OP': break;
-      default: throw new Error(`Unknown action type: ${action.type}`);
+      case 'NO_OP':
+        break;
+      default:
+        throw new Error(`Unknown action type: ${action.type}`);
     }
   }
 
   private async executeCreate(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
     if (!action.attributes) throw new Error('CREATE action missing attributes');
 
-    let contextAddress: Address;
-    try {
-      contextAddress = Address.parse(action.name);
-    } catch {
-      contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
-    }
+    const contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
 
     const inputs = this.convertAttributes(action.attributes, currentState, contextAddress);
     await provider.validate(action.resourceType, inputs);
 
     const id = await provider.create(action.resourceType, inputs);
-    const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
+    const key = contextAddress.toString();
 
     currentState.resources[key] = {
       id,
       type: 'Resource',
       resourceType: action.resourceType,
-      name: action.name,
+      name: contextAddress.name,
+      modulePath: contextAddress.modulePath,
       attributes: inputs,
     };
   }
 
   private async executeUpdate(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
-    if (!action.id) throw new Error('UPDATE action missing id');
     if (!action.changes) throw new Error('UPDATE action missing changes');
 
-    const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
+    const contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
+
+    const key = contextAddress.toString();
     const currentResource = currentState.resources[key];
+    if (!currentResource) throw new Error(`Resource "${key}" not found in state for update`);
+
     const newAttributes = { ...currentResource.attributes };
+    for (const [k, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[k] = change.new;
 
-    for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
-
-    let contextAddress: Address;
-    try {
-      contextAddress = Address.parse(key);
-    } catch {
-      contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
-    }
     const inputs = this.convertAttributes(newAttributes, currentState, contextAddress);
 
     await provider.validate(action.resourceType, inputs);
+    if (!action.id) throw new Error(`UPDATE action for "${key}" missing resource ID`);
     await provider.update(action.id, action.resourceType, inputs);
 
     currentResource.attributes = inputs;
@@ -472,8 +462,10 @@ export class Orchestrator {
   private async executeDelete(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
     if (!action.id) throw new Error('DELETE action missing id');
 
+    const contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
+
     await provider.delete(action.id, action.resourceType);
-    const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
+    const key = contextAddress.toString();
     delete currentState.resources[key];
   }
 
@@ -565,9 +557,9 @@ export class Orchestrator {
         throw new Error(`Resource "${resourceKey}" not found in state`);
       }
 
-      let attrValue: any = (resource as any)[attributeName];
-      if (attrValue === undefined) {
-        attrValue = resource.attributes[attributeName];
+      let attrValue: any = resource.attributes[attributeName];
+      if (attrValue === undefined && attributeName === 'id') {
+        attrValue = resource.id;
       }
 
       if (attrValue === undefined) {
@@ -584,6 +576,6 @@ export class Orchestrator {
 
   private getAddressScope(address?: Address): string {
     if (!address) return '';
-    return address.modulePath.map(p => `module.${p}`).join('.');
+    return address.modulePath.map((p) => `module.${p}`).join('.');
   }
 }

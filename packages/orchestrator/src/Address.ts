@@ -15,17 +15,31 @@ export class Address {
 
   static parse(input: string): Address {
     const parts = input.split('.');
-    if (parts.length < 2) throw new Error(`Invalid address format: ${input}`);
+
     const modulePath: string[] = [];
     let i = 0;
+
+    // Scan for module segments: module.<name>
     while (i < parts.length) {
       if (parts[i] === 'module') {
+        if (i + 1 >= parts.length) {
+          throw new Error(`Invalid address format: ${input} (incomplete module path)`);
+        }
         modulePath.push(parts[i + 1]);
         i += 2;
-      } else break;
+      } else {
+        break;
+      }
     }
+
+    // After scanning modules, we MUST have exactly 2 parts left: type and name
+    if (i + 2 !== parts.length) {
+      throw new Error(`Invalid address format: ${input} (expected type.name at end, got ${parts.length - i} parts)`);
+    }
+
     const resourceType = parts[i];
     const name = parts[i + 1];
+
     return new Address(modulePath, resourceType, name);
   }
 
@@ -35,7 +49,9 @@ export class Address {
     return prefix ? `${prefix}.${suffix}` : suffix;
   }
 
-  equals(other: Address): boolean { return this.toString() === other.toString(); }
+  equals(other: Address): boolean {
+    return this.toString() === other.toString();
+  }
 
   withParent(moduleName: string): Address {
     return new Address([moduleName, ...this.modulePath], this.resourceType, this.name);
