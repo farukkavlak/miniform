@@ -18,7 +18,12 @@ vi.mock('@miniform/state', () => ({
     write: writeMock,
     backend,
   })),
-  LocalBackend: vi.fn(() => ({})),
+  LocalBackend: vi.fn(() => ({
+    read: readMock,
+    write: writeMock,
+    lock: vi.fn(),
+    unlock: vi.fn(),
+  })),
 }));
 
 vi.mock('@miniform/planner', () => ({

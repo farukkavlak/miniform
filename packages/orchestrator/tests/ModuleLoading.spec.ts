@@ -10,9 +10,7 @@ import { Orchestrator } from '../src/index';
 vi.mock('node:fs');
 vi.mock('node:path');
 
-// Mock StateManager
 const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, version: 1 });
-// eslint-disable-next-line unicorn/no-useless-undefined
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => {
@@ -21,7 +19,12 @@ vi.mock('@miniform/state', () => {
     write: writeMock,
     backend,
   }));
-  const LocalBackend = vi.fn(() => ({}));
+  const LocalBackend = vi.fn(() => ({
+    read: readMock,
+    write: writeMock,
+    lock: vi.fn(),
+    unlock: vi.fn(),
+  }));
   return { StateManager, LocalBackend };
 });
 
