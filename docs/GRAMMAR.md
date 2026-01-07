@@ -192,7 +192,7 @@ resource "local_file" "derived" {
 **Not Yet Supported:**
 
 - Variable blocks (`variable "name" {}`)
-- Output blocks (`output "name" {}`)
+
 - Data sources (`data "type" "name" {}`)
 - Modules (`module "name" {}`)
 - String interpolation (`"${var.x}"`)
