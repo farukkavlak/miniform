@@ -66,7 +66,8 @@ export class Orchestrator {
     for (const stmt of program)
       if (stmt.type === 'Variable') {
         const defaultValue = stmt.attributes.default?.value;
-        if (defaultValue !== undefined) this.scopeManager.setVariable(scope, stmt.name, { value: defaultValue, context: address });
+        // Set variable even if no default (will be undefined until set by module inputs)
+        if (!this.scopeManager.getVariable(scope, stmt.name)) this.scopeManager.setVariable(scope, stmt.name, { value: defaultValue, context: address });
       }
   }
 
@@ -394,7 +395,7 @@ export class Orchestrator {
   }
 
   private interpolateString(value: string, state: IState, context?: Address): string {
-    return value.replaceAll(/\${([^}]+)}/g, (_: string, expr: string) => {
+    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
       const pathParts = expr.trim().split('.');
       const resolved = this.resolveReference(pathParts, state, context);
       return String(resolved ?? '');
