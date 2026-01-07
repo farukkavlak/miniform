@@ -33,8 +33,8 @@ export class Orchestrator {
   private dataSources: Map<string, Record<string, unknown>> = new Map();
   private stateManager: StateManager;
 
-  constructor(workingDir?: string) {
-    this.stateManager = new StateManager(workingDir);
+  constructor(stateManager: StateManager) {
+    this.stateManager = stateManager;
   }
 
   /**
@@ -403,7 +403,7 @@ export class Orchestrator {
   }
 
   private interpolateString(value: string, state: IState, context?: Address): string {
-    return value.replaceAll(/\${([^}]+)}/g, (_: string, expr: string) => {
+    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
       const pathParts = expr.trim().split('.');
       const resolved = this.resolveReference(pathParts, state, context);
       return String(resolved ?? '');

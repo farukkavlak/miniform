@@ -1,5 +1,5 @@
 import { IProvider, ISchema } from '@miniform/contracts';
-import { StateManager } from '@miniform/state';
+import { LocalBackend, StateManager } from '@miniform/state';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -57,7 +57,9 @@ describe('Orchestrator - Data Sources', () => {
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'orchestrator-data-test-'));
-    orchestrator = new Orchestrator(tmpDir);
+    const backend = new LocalBackend(tmpDir);
+    const stateManager = new StateManager(backend);
+    orchestrator = new Orchestrator(stateManager);
     mockProvider = new MockDataProvider();
     orchestrator.registerProvider(mockProvider);
   });
@@ -89,7 +91,8 @@ describe('Orchestrator - Data Sources', () => {
     await orchestrator.apply(config);
 
     // Verify
-    const stateManager = new StateManager(tmpDir);
+    const backend = new LocalBackend(tmpDir);
+    const stateManager = new StateManager(backend);
     const state = await stateManager.read();
 
     const resource = state.resources['mock_resource.app'];
@@ -136,7 +139,8 @@ describe('Orchestrator - Data Sources', () => {
 
     await orchestrator.apply(config);
 
-    const stateManager = new StateManager(tmpDir);
+    const backend = new LocalBackend(tmpDir);
+    const stateManager = new StateManager(backend);
     const state = await stateManager.read();
     const resource = state.resources['mock_resource.service'];
 

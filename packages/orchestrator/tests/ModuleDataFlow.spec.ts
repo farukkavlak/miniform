@@ -17,11 +17,13 @@ const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, versi
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => {
-  const StateManager = vi.fn(() => ({
+  const StateManager = vi.fn((backend) => ({
     read: readMock,
     write: writeMock,
+    backend,
   }));
-  return { StateManager };
+  const LocalBackend = vi.fn(() => ({}));
+  return { StateManager, LocalBackend };
 });
 
 // Mock Planner
@@ -55,7 +57,10 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
       getSchema: vi.fn().mockReturnValue({}),
     };
 
-    orchestrator = new Orchestrator();
+    const { StateManager, LocalBackend } = require('@miniform/state');
+    const backend = new LocalBackend();
+    const stateManager = new StateManager(backend);
+    orchestrator = new Orchestrator(stateManager);
     orchestrator.registerProvider(mockProvider);
 
     // Mock path.resolve

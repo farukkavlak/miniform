@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "variables": {
+    "": {},
+    "module.L2": {
+      "region": {
+        "type": "String",
+        "value": "eu-west-1"
+      }
+    }
+  },
+  "resources": {
+    "test_resource.res": {
+      "id": "created-id",
+      "type": "Resource",
+      "resourceType": "test_resource",
+      "name": "res",
+      "modulePath": [],
+      "attributes": {
+        "region": "us-east-1"
+      }
+    },
+    "module.app.test_resource.server": {
+      "id": "created-id",
+      "type": "Resource",
+      "resourceType": "test_resource",
+      "name": "server",
+      "modulePath": [
+        "app"
+      ],
+      "attributes": {
+        "tags": "production"
+      }
+    },
+    "module.L2.test_resource.child": {
+      "id": "created-id",
+      "type": "Resource",
+      "resourceType": "test_resource",
+      "name": "child",
+      "modulePath": [
+        "L2"
+      ],
+      "attributes": {
+        "loc": "eu-west-1"
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { StateManager } from '@miniform/state';
+import { LocalBackend, StateManager } from '@miniform/state';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import fs from 'node:fs/promises';
@@ -17,7 +17,8 @@ export function createInitCommand() {
       console.log(chalk.green(`✓ Created ${miniformDir}`));
 
       // 2. Initialize empty state
-      const stateManager = new StateManager(cwd);
+      const backend = new LocalBackend(cwd);
+      const stateManager = new StateManager(backend);
       // Create empty state
       await stateManager.write({ version: 1, resources: {} });
       console.log(chalk.green(`✓ Initialized state.json`));

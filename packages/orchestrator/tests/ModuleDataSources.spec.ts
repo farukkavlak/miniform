@@ -13,10 +13,12 @@ const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, versi
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => ({
-  StateManager: vi.fn(() => ({
+  StateManager: vi.fn((backend) => ({
     read: readMock,
     write: writeMock,
+    backend,
   })),
+  LocalBackend: vi.fn(() => ({})),
 }));
 
 vi.mock('@miniform/planner', () => ({
@@ -49,7 +51,11 @@ describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
       delete: vi.fn(),
       getSchema: vi.fn().mockReturnValue({}),
     };
-    orchestrator = new Orchestrator();
+    // Mock classes are already imported via vi.mock
+    const { StateManager, LocalBackend } = require('@miniform/state');
+    const backend = new LocalBackend();
+    const stateManager = new StateManager(backend);
+    orchestrator = new Orchestrator(stateManager);
     orchestrator.registerProvider(mockProvider);
     (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
     (path.join as Mock).mockImplementation((...args: string[]) => args.join('/'));

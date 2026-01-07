@@ -1,6 +1,7 @@
 import { Orchestrator } from '@miniform/orchestrator';
 import { PlanAction, serializePlan } from '@miniform/planner';
 import { LocalProvider } from '@miniform/provider-local';
+import { LocalBackend, StateManager } from '@miniform/state';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import fs from 'node:fs/promises';
@@ -40,7 +41,9 @@ function displayPlanSummary(actions: PlanAction[]): void {
 async function executePlan(cwd: string, configPath: string, outFile?: string): Promise<void> {
   const configContent = await fs.readFile(configPath, 'utf8');
 
-  const orchestrator = new Orchestrator(cwd);
+  const backend = new LocalBackend(cwd);
+  const stateManager = new StateManager(backend);
+  const orchestrator = new Orchestrator(stateManager);
   orchestrator.registerProvider(new LocalProvider());
 
   console.log(chalk.blue('Refreshing state...'));
