@@ -37,18 +37,17 @@ export class Orchestrator {
    */
   private processVariables(program: ReturnType<Parser['parse']>): void {
     this.variables.clear();
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Variable') {
         const defaultValue = stmt.attributes.default?.value;
         this.variables.set(stmt.name, defaultValue);
       }
-    }
   }
 
   private async processDataSources(program: ReturnType<Parser['parse']>, state: IState): Promise<void> {
     this.dataSources.clear();
 
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Data') {
         const provider = this.providers.get(stmt.dataSourceType);
         if (!provider) throw new Error(`Provider for data source type "${stmt.dataSourceType}" not registered`);
@@ -65,7 +64,6 @@ export class Orchestrator {
         // Store in dataSources map
         this.dataSources.set(`${stmt.dataSourceType}.${stmt.name}`, resolvedAttributes);
       }
-    }
   }
 
   /**
@@ -89,12 +87,11 @@ export class Orchestrator {
     // 5. Generate execution plan
     // Fetch schemas for all resources in desired state
     const schemas: Record<string, ISchema> = {};
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Resource' && !schemas[stmt.resourceType]) {
         const schema = await this.getSchema(stmt.resourceType);
         if (schema) schemas[stmt.resourceType] = schema;
       }
-    }
 
     return plan(program, currentState, schemas);
   }
@@ -116,19 +113,14 @@ export class Orchestrator {
 
     // 4. Build dependency graph with edges from resource references
     const graph = new Graph<null>();
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Resource') {
         const key = `${stmt.resourceType}.${stmt.name}`;
         graph.addNode(key, null);
       }
-    }
 
     // Add edges for resource references (dependencies)
-    for (const stmt of program) {
-      if (stmt.type === 'Resource') {
-        this.addResourceDependencies(stmt, graph);
-      }
-    }
+    for (const stmt of program) if (stmt.type === 'Resource') this.addResourceDependencies(stmt, graph);
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
 
@@ -137,9 +129,7 @@ export class Orchestrator {
 
     // 6. Execute DELETE actions (not in graph since they're not in desired state)
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
-    for (const action of deleteActions) {
-      await this.executeAction(action, currentState);
-    }
+    for (const action of deleteActions) await this.executeAction(action, currentState);
 
     // 7. Add variables to state
     currentState.variables = Object.fromEntries(this.variables);
@@ -153,12 +143,12 @@ export class Orchestrator {
 
   private processOutputs(program: ReturnType<Parser['parse']>, state: IState): Record<string, unknown> {
     const outputs: Record<string, unknown> = {};
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Output') {
         const resolved = this.resolveValue(stmt.value, state);
         outputs[stmt.name] = resolved;
       }
-    }
+
     return outputs;
   }
 
@@ -170,18 +160,17 @@ export class Orchestrator {
 
   private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>): void {
     const key = `${stmt.resourceType}.${stmt.name}`;
-    for (const attr of Object.values(stmt.attributes)) {
+    for (const attr of Object.values(stmt.attributes))
       if (attr.type === 'Reference' && attr.value[0] !== 'var') {
         const depKey = `${attr.value[0]}.${attr.value[1]}`;
         if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
       }
-    }
   }
 
   private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState): Promise<void> {
     const layers = graph.topologicalSort();
 
-    for (const layer of layers) {
+    for (const layer of layers)
       // Execute all actions in this layer in parallel
       await Promise.all(
         layer.map(async (resourceKey: string) => {
@@ -191,7 +180,6 @@ export class Orchestrator {
           await this.executeAction(action, currentState);
         })
       );
-    }
   }
 
   private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
@@ -249,9 +237,7 @@ export class Orchestrator {
     const currentResource = currentState.resources[`${action.resourceType}.${action.name}`];
     const newAttributes = { ...currentResource.attributes };
 
-    for (const [key, change] of Object.entries(action.changes)) {
-      if (change.new !== undefined) newAttributes[key] = change.new;
-    }
+    for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
 
     const inputs = this.convertAttributes(newAttributes, currentState);
 
@@ -272,17 +258,14 @@ export class Orchestrator {
   private convertAttributes(attributes: Record<string, unknown>, state: IState): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(attributes)) {
+    for (const [key, value] of Object.entries(attributes))
       // AttributeValue has { type, value } structure
       if (value && typeof value === 'object' && 'type' in value) {
         const attrValue = value as { type: string; value: unknown };
         if (attrValue.type === 'Reference') result[key] = this.resolveReference(attrValue.value as string[], state);
         else if (attrValue.type === 'String') result[key] = this.interpolateString(attrValue.value as string, state);
         else result[key] = attrValue.value;
-      } else {
-        result[key] = value;
-      }
-    }
+      } else result[key] = value;
 
     return result;
   }
@@ -340,9 +323,7 @@ export class Orchestrator {
     const attrValue = resource.attributes[attrName];
     if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on resource "${resourceKey}"`);
 
-    if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) {
-      return (attrValue as { value: unknown }).value;
-    }
+    if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
 
     return attrValue;
   }

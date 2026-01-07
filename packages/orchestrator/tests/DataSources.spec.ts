@@ -12,15 +12,18 @@ class MockDataProvider implements IProvider {
   readonly resources = ['mock_resource', 'mock_data', 'unknown_provider'];
   data = new Map<string, Record<string, unknown>>();
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getSchema(_type: string): Promise<ISchema> {
     return {};
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing
   }
 
-  async create(_type: string, inputs: Record<string, unknown>): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async create(_type: string, _inputs: Record<string, unknown>): Promise<string> {
     return 'created-id';
   }
 
@@ -33,10 +36,9 @@ class MockDataProvider implements IProvider {
   // Implement read for data sources
   async read(type: string, inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
     if (type === 'mock_data') {
-      const id = inputs['id'] as string;
-      if (this.data.has(id)) {
-        return this.data.get(id)!;
-      }
+      const id = inputs.id as string;
+      if (this.data.has(id)) return this.data.get(id)!;
+
       throw new Error(`Data source mock_data with id ${id} not found`);
     }
     return {};
@@ -92,8 +94,8 @@ describe('Orchestrator - Data Sources', () => {
 
     const resource = state.resources['mock_resource.app'];
     expect(resource).toBeDefined();
-    expect(resource.attributes['owner']).toBe('testuser');
-    expect(resource.attributes['contact']).toBe('test@example.com');
+    expect(resource.attributes.owner).toBe('testuser');
+    expect(resource.attributes.contact).toBe('test@example.com');
   });
 
   it('should throw error if data source provider is not registered', async () => {
@@ -138,6 +140,6 @@ describe('Orchestrator - Data Sources', () => {
     const state = await stateManager.read();
     const resource = state.resources['mock_resource.service'];
 
-    expect(resource.attributes['url']).toBe('https://api.example.com:8080/v1');
+    expect(resource.attributes.url).toBe('https://api.example.com:8080/v1');
   });
 });

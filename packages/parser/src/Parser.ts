@@ -132,13 +132,10 @@ export class Parser {
       parts.push(this.advance().value);
 
       // Subsequent parts (dot separated)
-      while (this.matchToken(TokenType.Dot)) {
-        if (this.check(TokenType.Identifier) || this.check(TokenType.Data) || this.check(TokenType.Variable) || this.check(TokenType.Resource) || this.check(TokenType.Output)) {
+      while (this.matchToken(TokenType.Dot))
+        if (this.check(TokenType.Identifier) || this.check(TokenType.Data) || this.check(TokenType.Variable) || this.check(TokenType.Resource) || this.check(TokenType.Output))
           parts.push(this.advance().value);
-        } else {
-          return this.error('Expect property name after dot.');
-        }
-      }
+        else return this.error('Expect property name after dot.');
 
       return { type: 'Reference', value: parts };
     }
