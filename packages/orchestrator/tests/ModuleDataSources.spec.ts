@@ -1,21 +1,28 @@
 import { plan } from '@miniform/planner';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { Orchestrator } from '../src/index';
 
 vi.mock('node:fs');
-vi.mock('node:path');
 
 const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, version: 1 });
-// eslint-disable-next-line unicorn/no-useless-undefined
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => ({
-  StateManager: vi.fn(() => ({
+  StateManager: vi.fn((backend) => ({
     read: readMock,
     write: writeMock,
+    backend,
+  })),
+  LocalBackend: vi.fn(() => ({
+    read: readMock,
+    write: writeMock,
+    lock: vi.fn(),
+    unlock: vi.fn(),
   })),
 }));
 
@@ -24,6 +31,7 @@ vi.mock('@miniform/planner', () => ({
 }));
 
 describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
+  let tmpDir: string;
   let orchestrator: Orchestrator;
   let mockProvider: {
     resources: string[];
@@ -35,40 +43,47 @@ describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
     getSchema: Mock;
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'orchestrator-datasources-test-'));
+
     mockProvider = {
       resources: ['test_resource', 'aws_ami'],
       validate: vi.fn(),
       create: vi.fn().mockResolvedValue('created-id'),
-      read: vi.fn().mockImplementation(async (type, inputs) => {
-        if (type === 'aws_ami') return { id: `ami-${inputs.name}` };
-        return {};
-      }),
+      read: vi.fn().mockResolvedValue({ id: 'ami-12345', name: 'Ubuntu 20.04' }),
       update: vi.fn(),
       delete: vi.fn(),
       getSchema: vi.fn().mockReturnValue({}),
     };
-    orchestrator = new Orchestrator();
+
+    const { StateManager, LocalBackend } = await import('@miniform/state');
+    const backend = new LocalBackend(tmpDir);
+    const stateManager = new StateManager(backend);
+    orchestrator = new Orchestrator(stateManager);
     orchestrator.registerProvider(mockProvider);
-    (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
-    (path.join as Mock).mockImplementation((...args: string[]) => args.join('/'));
+
+    (plan as Mock).mockReturnValue([]);
+  });
+
+  afterEach(async () => {
+    if (tmpDir) await fsPromises.rm(tmpDir, { recursive: true, force: true });
   });
 
   it('should resolve data sources defined in modules', async () => {
     const rootConfig = `
-            module "app" {
-                source = "./app"
-            }
-        `;
+module "app" {
+  source = "./app"
+}
+`;
     const appConfig = `
             data "aws_ami" "ubuntu" {
-                name = "focal"
-            }
+  name = "focal"
+}
             resource "test_resource" "server" {
-                ami = "\${data.aws_ami.ubuntu.id}"
-            }
-        `;
+  ami = "\${data.aws_ami.ubuntu.id}"
+}
+`;
 
     (fs.existsSync as Mock).mockReturnValue(true);
     (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
@@ -90,23 +105,23 @@ describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
 
     const stateArg = writeMock.mock.calls[0][0];
     const resource = stateArg.resources['module.app.test_resource.server'];
-    expect(resource.attributes.ami).toBe('ami-focal');
+    expect(resource.attributes.ami).toBe('ami-12345');
   });
 
   it('should NOT resolve root data source from child module without prefix (Scoping test)', async () => {
     const rootConfig = `
             data "aws_ami" "root_ami" {
-                name = "global"
-            }
-            module "app" {
-                source = "./app"
-            }
-        `;
+  name = "global"
+}
+module "app" {
+  source = "./app"
+}
+`;
     const appConfig = `
             resource "test_resource" "server" {
-                ami = "\${data.aws_ami.root_ami.id}"
-            }
-        `;
+  ami = "\${data.aws_ami.root_ami.id}"
+}
+`;
 
     (fs.existsSync as Mock).mockReturnValue(true);
     (fs.readFileSync as Mock).mockImplementation((f: string) => (f.endsWith('app/main.mf') ? appConfig : rootConfig));

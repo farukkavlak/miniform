@@ -1,27 +1,32 @@
 /* eslint-disable camelcase */
-// Import plan to spy on it
 import { plan } from '@miniform/planner';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { Orchestrator } from '../src/index';
 
 // Mock fs and path
 vi.mock('node:fs');
-vi.mock('node:path');
 
-// Mock StateManager
 const readMock = vi.fn().mockResolvedValue({ resources: {}, variables: {}, version: 1 });
-// eslint-disable-next-line unicorn/no-useless-undefined
 const writeMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@miniform/state', () => {
-  const StateManager = vi.fn(() => ({
+  const StateManager = vi.fn((backend) => ({
     read: readMock,
     write: writeMock,
+    backend,
   }));
-  return { StateManager };
+  const LocalBackend = vi.fn(() => ({
+    read: readMock,
+    write: writeMock,
+    lock: vi.fn(),
+    unlock: vi.fn(),
+  }));
+  return { StateManager, LocalBackend };
 });
 
 // Mock Planner
@@ -30,6 +35,7 @@ vi.mock('@miniform/planner', () => ({
 }));
 
 describe('Orchestrator - Phase 4: Data Flow', () => {
+  let tmpDir: string;
   let orchestrator: Orchestrator;
   let mockProvider: {
     resources: string[];
@@ -41,8 +47,9 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
     getSchema: Mock;
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'orchestrator-dataflow-test-'));
 
     // Setup mock provider
     mockProvider = {
@@ -55,15 +62,18 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
       getSchema: vi.fn().mockReturnValue({}),
     };
 
-    orchestrator = new Orchestrator();
+    const { StateManager, LocalBackend } = await import('@miniform/state');
+    const backend = new LocalBackend(tmpDir);
+    const stateManager = new StateManager(backend);
+    orchestrator = new Orchestrator(stateManager);
     orchestrator.registerProvider(mockProvider);
-
-    // Mock path.resolve
-    (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
-    (path.join as Mock).mockImplementation((...args: string[]) => args.join('/'));
 
     // Ensure plan returns empty array by default
     (plan as Mock).mockReturnValue([]);
+  });
+
+  afterEach(async () => {
+    if (tmpDir) await fsPromises.rm(tmpDir, { recursive: true, force: true });
   });
 
   it('should use default variable value in root scope', async () => {
@@ -71,11 +81,11 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
     const config = `
             variable "region" {
                 default = "us-east-1"
-            }
+}
             resource "test_resource" "res" {
-                region = "\${var.region}"
-            }
-        `;
+  region = "\${var.region}"
+}
+`;
 
     // Mock Plan to return action
     (plan as Mock).mockReturnValue([
@@ -105,20 +115,20 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
 
   it('should pass inputs to child module variables', async () => {
     const rootConfig = `
-            module "app" {
-                source = "./app"
-                env = "production"
-            }
-        `;
+module "app" {
+  source = "./app"
+  env = "production"
+}
+`;
 
     const appConfig = `
             variable "env" {
                 default = "dev"
-            }
+}
             resource "test_resource" "server" {
-                tags = "\${var.env}"
-            }
-        `;
+  tags = "\${var.env}"
+}
+`;
 
     (fs.existsSync as Mock).mockReturnValue(true);
     (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
@@ -151,17 +161,17 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
   it('should handle nested variable scopes correctly', async () => {
     // Root (region=us) -> L2 (region=eu) -> Resource uses var.region
     const rootConfig = `
-            module "L2" {
-                source = "./L2"
-                region = "eu-west-1"
-            }
-        `;
+module "L2" {
+  source = "./L2"
+  region = "eu-west-1"
+}
+`;
     const l2Config = `
             variable "region" { default = "us-east-1" }
             resource "test_resource" "child" {
-                loc = "\${var.region}"
-            }
-        `;
+  loc = "\${var.region}"
+}
+`;
 
     (fs.existsSync as Mock).mockReturnValue(true);
     (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
@@ -197,21 +207,21 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
 
   it('should resolve module outputs and satisfy parent dependencies', async () => {
     const rootConfig = `
-            module "db" {
-                source = "./db"
-            }
+module "db" {
+  source = "./db"
+}
             resource "test_resource" "app" {
-                db_id = "\${module.db.id}"
-            }
-        `;
+  db_id = "\${module.db.id}"
+}
+`;
     const dbConfig = `
             resource "test_resource" "instance" {
-                name = "sql-server"
-            }
+  name = "sql-server"
+}
             output "id" {
-                value = "\${test_resource.instance.id}"
-            }
-        `;
+  value = "db-123"
+}
+`;
 
     (fs.existsSync as Mock).mockReturnValue(true);
     (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
@@ -237,7 +247,6 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
       },
     ]);
 
-    // Mock provider behavior to simulate resource ID generation
     mockProvider.create.mockImplementation((type: string, inputs: Record<string, unknown>) => {
       if (inputs.name === 'sql-server') return 'db-123';
       return 'app-456';

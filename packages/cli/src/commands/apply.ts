@@ -1,6 +1,7 @@
 import { Orchestrator } from '@miniform/orchestrator';
 import { PlanAction, PlanFile, validatePlanFile } from '@miniform/planner';
 import { LocalProvider } from '@miniform/provider-local';
+import { LocalBackend, StateManager } from '@miniform/state';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
@@ -42,7 +43,9 @@ async function confirmApply(autoConfirm: boolean): Promise<boolean> {
 async function executeApply(cwd: string, configPath: string, autoConfirm: boolean): Promise<void> {
   const configContent = await fs.readFile(configPath, 'utf8');
 
-  const orchestrator = new Orchestrator(cwd);
+  const backend = new LocalBackend(cwd);
+  const stateManager = new StateManager(backend);
+  const orchestrator = new Orchestrator(stateManager);
   orchestrator.registerProvider(new LocalProvider());
 
   // Show plan first
@@ -73,7 +76,9 @@ async function executeApply(cwd: string, configPath: string, autoConfirm: boolea
 }
 
 async function executeApplyFromPlan(cwd: string, planFile: PlanFile, autoConfirm: boolean): Promise<void> {
-  const orchestrator = new Orchestrator(cwd);
+  const backend = new LocalBackend(cwd);
+  const stateManager = new StateManager(backend);
+  const orchestrator = new Orchestrator(stateManager);
   orchestrator.registerProvider(new LocalProvider());
 
   console.log(chalk.blue('Applying from saved plan...'));

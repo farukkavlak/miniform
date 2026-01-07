@@ -1,23 +1,15 @@
 import { IProvider, ISchema } from '@miniform/contracts';
 import { Graph } from '@miniform/graph';
-import { AttributeValue, Lexer, Parser, ResourceBlock, Statement } from '@miniform/parser';
+import { AttributeValue, Lexer, Parser, Statement } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
-import * as fs from 'node:fs';
-import path from 'node:path';
 
 import { Address } from './Address';
-
-export interface LoadedResource {
-  uniqueId: string; // "module.vpc.aws_subnet.private"
-  address: Address;
-  block: ResourceBlock;
-}
-
-export interface LoadedModule {
-  address: Address;
-  program: Statement[];
-}
+import { ActionExecutor } from './components/ActionExecutor';
+import { DependencyGraphBuilder } from './components/DependencyGraphBuilder';
+import { LoadedModule, LoadedResource, ModuleLoader } from './components/ModuleLoader';
+import { ReferenceResolver } from './resolvers/ReferenceResolver';
+import { ScopeManager } from './scope/ScopeManager';
 
 interface VariableValue {
   value: unknown;
@@ -26,15 +18,21 @@ interface VariableValue {
 
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
-  // Map<ScopeAddressString, Map<VarName, VariableValue>>
-  private variables: Map<string, Map<string, VariableValue>> = new Map();
-  // Map<ScopeAddressString, Map<OutputName, ResolvedValue>>
-  private outputsRegistry: Map<string, Map<string, unknown>> = new Map();
   private dataSources: Map<string, Record<string, unknown>> = new Map();
   private stateManager: StateManager;
+  private scopeManager: ScopeManager;
+  private referenceResolver: ReferenceResolver;
+  private moduleLoader: ModuleLoader;
+  private actionExecutor: ActionExecutor;
+  private dependencyGraphBuilder: DependencyGraphBuilder;
 
-  constructor(workingDir?: string) {
-    this.stateManager = new StateManager(workingDir);
+  constructor(stateManager: StateManager) {
+    this.stateManager = stateManager;
+    this.scopeManager = new ScopeManager();
+    this.referenceResolver = new ReferenceResolver(this.scopeManager, this.dataSources);
+    this.moduleLoader = new ModuleLoader(this.processVariables.bind(this), this.initializeChildVariables.bind(this), this.getAttributesMap.bind(this));
+    this.dependencyGraphBuilder = new DependencyGraphBuilder(this.scopeManager);
+    this.actionExecutor = new ActionExecutor(this.providers, this.convertAttributes.bind(this), this.resolveOutputByKey.bind(this));
   }
 
   /**
@@ -58,25 +56,19 @@ export class Orchestrator {
   /**
    * Process variable declarations for a specific scope
    */
-  private processVariables(program: Statement[], scopeAddress: Address): void {
-    const scope = this.getAddressScope(scopeAddress);
-    if (!this.variables.has(scope)) this.variables.set(scope, new Map());
-    const scopeVars = this.variables.get(scope)!;
+  private processVariables(program: Statement[], address: Address): void {
+    const scope = this.scopeManager.getScope(address);
 
     for (const stmt of program)
       if (stmt.type === 'Variable') {
         const defaultValue = stmt.attributes.default?.value;
-        // Only set default if not already set (e.g. by module inputs)
-        if (!scopeVars.has(stmt.name))
-          scopeVars.set(stmt.name, {
-            value: defaultValue,
-            context: scopeAddress, // Defaults are defined in the module's own scope
-          });
+        // Set variable even if no default (will be undefined until set by module inputs)
+        if (!this.scopeManager.getVariable(scope, stmt.name)) this.scopeManager.setVariable(scope, stmt.name, { value: defaultValue, context: address });
       }
   }
 
   private async processDataSources(program: Statement[], state: IState, scopeAddress: Address): Promise<void> {
-    const scope = this.getAddressScope(scopeAddress);
+    const scope = this.scopeManager.getScope(scopeAddress);
 
     for (const stmt of program)
       if (stmt.type === 'Data') {
@@ -99,39 +91,6 @@ export class Orchestrator {
   }
 
   /**
-   * Recursively loads modules and flattens resources
-   */
-  async loadModuleTree(
-    program: Statement[],
-    rootDir: string,
-    parentAddress: Address,
-    moduleAccumulator: LoadedModule[] = []
-  ): Promise<{ resources: LoadedResource[]; modules: LoadedModule[] }> {
-    const resources: LoadedResource[] = [];
-
-    // Add current module to accumulator
-    moduleAccumulator.push({ address: parentAddress, program });
-
-    // Initialize variables map for this scope
-    this.processVariables(program, parentAddress);
-
-    for (const stmt of program)
-      if (stmt.type === 'Resource') {
-        const address = new Address(parentAddress.modulePath, stmt.resourceType, stmt.name);
-        resources.push({
-          uniqueId: address.toString(),
-          address,
-          block: stmt,
-        });
-      } else if (stmt.type === 'Module') {
-        const subResources = await this.loadChildModule(stmt, rootDir, parentAddress, moduleAccumulator);
-        resources.push(...subResources);
-      }
-
-    return { resources, modules: moduleAccumulator };
-  }
-
-  /**
    * Generate an execution plan without applying it
    */
   async plan(configContent: string, rootDir: string = process.cwd()): Promise<PlanAction[]> {
@@ -139,15 +98,14 @@ export class Orchestrator {
     const parser = new Parser(lexer.tokenize());
     const program = parser.parse() || [];
 
-    this.variables.clear();
+    this.scopeManager.clear();
+    this.processVariables(program, new Address([], '', ''));
 
-    const { resources: loadedResources } = await this.loadModuleTree(Array.isArray(program) ? Array.from(program) : [], rootDir, new Address([], '', ''));
+    const { resources: loadedResources, modules: loadedModules } = await this.moduleLoader.loadModuleTree(rootDir, program);
 
     const currentState = await this.stateManager.read();
 
-    // 4. Process Data Sources for all modules
     this.dataSources.clear();
-    const { modules: loadedModules } = await this.loadModuleTree(Array.isArray(program) ? Array.from(program) : [], rootDir, new Address([], '', ''));
     for (const mod of loadedModules) await this.processDataSources(mod.program, currentState, mod.address);
 
     const virtualProgram: Statement[] = loadedResources.map((r) => ({
@@ -169,23 +127,22 @@ export class Orchestrator {
     const allActions = await this.plan(configContent, rootDir);
     const currentState = await this.stateManager.read();
 
-    this.variables.clear();
-    this.outputsRegistry.clear();
+    this.scopeManager.clear();
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
     const mainProgram = parser.parse() || [];
-    const safeProgram = Array.isArray(mainProgram) ? Array.from(mainProgram) : [];
 
-    const { resources: loadedResources, modules: loadedModules } = await this.loadModuleTree(safeProgram, rootDir, new Address([], '', ''));
+    this.processVariables(mainProgram, new Address([], '', ''));
 
-    // Process Data Sources
+    const { resources: loadedResources, modules: loadedModules } = await this.moduleLoader.loadModuleTree(rootDir, mainProgram);
+
     this.dataSources.clear();
     for (const mod of loadedModules) await this.processDataSources(mod.program, currentState, mod.address);
 
-    const graph = this.buildExecutionGraph(loadedResources, loadedModules);
+    const graph = this.dependencyGraphBuilder.buildExecutionGraph(loadedResources, loadedModules);
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
-    await this.executeActionsSequentially(createUpdateActions, graph, currentState, loadedModules);
+    await this.actionExecutor.executeActionsSequentially(createUpdateActions, graph, currentState, loadedModules);
 
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
     for (const action of deleteActions) await this.executeAction(action, currentState);
@@ -194,21 +151,18 @@ export class Orchestrator {
 
     await this.stateManager.write(currentState);
 
-    return this.processOutputs(safeProgram, currentState, Address.root('', ''));
+    return this.processOutputs(mainProgram, currentState, Address.root('', ''));
   }
 
   private processOutputs(program: Statement[], state: IState, context: Address): Record<string, unknown> {
     const outputs: Record<string, unknown> = {};
-    const scope = this.getAddressScope(context);
+    const scope = this.scopeManager.getScope(context);
 
     for (const stmt of program)
       if (stmt.type === 'Output') {
         const resolved = this.resolveValue(stmt.value, state, context);
         outputs[stmt.name] = resolved;
-
-        // Store in registry
-        if (!this.outputsRegistry.has(scope)) this.outputsRegistry.set(scope, new Map());
-        this.outputsRegistry.get(scope)!.set(stmt.name, resolved);
+        this.scopeManager.setOutput(scope, stmt.name, resolved);
       }
 
     return outputs;
@@ -230,93 +184,16 @@ export class Orchestrator {
     return result;
   }
 
-  private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>, parsedAddress: Address): void {
-    const key = parsedAddress.toString();
-    for (const attr of Object.values(stmt.attributes)) this.addValueDependencies(attr, graph, key, parsedAddress);
-  }
-
-  private addValueDependencies(value: unknown, graph: Graph<null>, dependentKey: string, context: Address): void {
-    if (!value || typeof value !== 'object') return;
-
-    const typedValue = value as { type: string; value: unknown };
-    if (typedValue.type === 'Reference') this.addReferenceDependencies(typedValue.value as string[], graph, dependentKey, context);
-    else if (typedValue.type === 'String') this.addInterpolationDependencies(typedValue.value as string, graph, dependentKey, context);
-  }
-
-  private addReferenceDependencies(refParts: string[], graph: Graph<null>, dependentKey: string, context: Address): void {
-    if (refParts[0] === 'var') {
-      const scope = this.getAddressScope(context);
-      const variable = this.variables.get(scope)?.get(refParts[1]);
-      if (variable) this.addValueDependencies(variable.value, graph, dependentKey, variable.context);
-    } else if (refParts[0] === 'module') {
-      const moduleName = refParts[1];
-      const outputName = refParts[2];
-      const currentScope = this.getAddressScope(context);
-      const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
-
-      const depKey = `${childScope}.outputs.${outputName}`;
-      if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
-    } else {
-      const depAddr = new Address(context.modulePath, refParts[0], refParts[1]);
-      const depKey = depAddr.toString();
-      if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
-    }
-  }
-
-  private addInterpolationDependencies(content: string, graph: Graph<null>, dependentKey: string, context: Address): void {
-    const exprs = content.match(/\${([^}]+)}/g) || [];
-    for (const expr of exprs) {
-      const pathParts = expr.slice(2, -1).trim().split('.');
-      this.addReferenceDependencies(pathParts, graph, dependentKey, context);
-    }
-  }
-
-  private async executeActionsSequentially(actions: PlanAction[], graph: Graph<null>, currentState: IState, loadedModules: LoadedModule[]): Promise<void> {
-    const layers = graph.topologicalSort();
-
-    for (const layer of layers)
-      await Promise.all(
-        layer.map(async (key: string) => {
-          if (key.includes('.outputs.')) {
-            this.resolveOutputByKey(key, loadedModules, currentState);
-            return;
-          }
-
-          const action = actions.find((a) => new Address(a.modulePath || [], a.resourceType, a.name).toString() === key);
-          if (action) await this.executeAction(action, currentState);
-        })
-      );
-  }
-
-  private buildExecutionGraph(loadedResources: LoadedResource[], loadedModules: LoadedModule[]): Graph<null> {
-    const graph = new Graph<null>();
-    for (const { uniqueId } of loadedResources) graph.addNode(uniqueId, null);
-
-    for (const mod of loadedModules) {
-      const scope = this.getAddressScope(mod.address);
-      for (const stmt of mod.program)
-        if (stmt.type === 'Output') {
-          const outputKey = scope ? `${scope}.outputs.${stmt.name}` : `outputs.${stmt.name}`;
-          graph.addNode(outputKey, null);
-          this.addValueDependencies(stmt.value, graph, outputKey, mod.address);
-        }
-    }
-
-    for (const { address, block } of loadedResources) this.addResourceDependencies(block, graph, address);
-
-    return graph;
-  }
-
   private resolveOutputByKey(key: string, loadedModules: LoadedModule[], currentState: IState): void {
     const parts = key.split('.outputs.');
     const scope = parts[0];
-    const mod = loadedModules.find((m) => this.getAddressScope(m.address) === scope);
+    const mod = loadedModules.find((m) => this.scopeManager.getScope(m.address) === scope);
     if (mod) this.processOutputs(mod.program, currentState, mod.address);
   }
 
   private syncStateVariables(currentState: IState): void {
     const varsObj: Record<string, Record<string, unknown>> = {};
-    for (const [scope, varMap] of this.variables.entries()) {
+    for (const [scope, varMap] of this.scopeManager.getAllVariables().entries()) {
       const simpleVarMap: Record<string, unknown> = {};
       for (const [k, v] of varMap.entries()) simpleVarMap[k] = v.value;
       varsObj[scope] = simpleVarMap;
@@ -330,80 +207,28 @@ export class Orchestrator {
 
     switch (action.type) {
       case 'CREATE': {
-        await this.executeCreate(action, provider, currentState);
+        await this.actionExecutor.executeCreate(action, provider, currentState);
         break;
       }
       case 'UPDATE': {
-        await this.executeUpdate(action, provider, currentState);
+        await this.actionExecutor.executeUpdate(action, provider, currentState);
         break;
       }
       case 'DELETE': {
-        await this.executeDelete(action, provider, currentState);
+        await this.actionExecutor.executeDelete(action, provider, currentState);
         break;
       }
       case 'NO_OP': {
         break;
       }
       default: {
-        throw new Error(`Unknown action type: ${action.type}`);
+        throw new Error(`Unknown action type: ${(action as any).type}`);
       }
     }
   }
 
-  private async executeCreate(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
-    if (!action.attributes) throw new Error('CREATE action missing attributes');
-
-    const contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
-    const inputs = this.convertAttributes(action.attributes, currentState, contextAddress);
-
-    await provider.validate(action.resourceType, inputs);
-    const id = await provider.create(action.resourceType, inputs);
-
-    const key = contextAddress.toString();
-    const resources = currentState.resources; // Capture reference
-    resources[key] = {
-      id,
-      type: 'Resource',
-      resourceType: action.resourceType,
-      name: contextAddress.name,
-      modulePath: contextAddress.modulePath,
-      attributes: inputs,
-    };
-  }
-
-  private async executeUpdate(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
-    if (!action.changes) throw new Error('UPDATE action missing changes');
-
-    const contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
-
-    const key = contextAddress.toString();
-    const currentResource = currentState.resources[key];
-    if (!currentResource) throw new Error(`Resource "${key}" not found in state for update`);
-
-    const newAttributes = { ...currentResource.attributes };
-    for (const [k, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[k] = change.new;
-
-    const inputs = this.convertAttributes(newAttributes, currentState, contextAddress);
-
-    await provider.validate(action.resourceType, inputs);
-    if (!action.id) throw new Error(`UPDATE action for "${key}" missing resource ID`);
-    await provider.update(action.id, action.resourceType, inputs);
-
-    currentResource.attributes = inputs;
-  }
-
-  private async executeDelete(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
-    if (!action.id) throw new Error('DELETE action missing id');
-
-    const contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
-
-    await provider.delete(action.id, action.resourceType);
-    const key = contextAddress.toString();
-    delete currentState.resources[key];
-  }
-
   private interpolateString(value: string, state: IState, context?: Address): string {
-    return value.replaceAll(/\${([^}]+)}/g, (_: string, expr: string) => {
+    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
       const pathParts = expr.trim().split('.');
       const resolved = this.resolveReference(pathParts, state, context);
       return String(resolved ?? '');
@@ -421,12 +246,11 @@ export class Orchestrator {
 
   private resolveVariableReference(pathParts: string[], state: IState, context?: Address): unknown {
     const varName = pathParts[1];
-    const scope = this.getAddressScope(context);
+    const scope = this.scopeManager.getScope(context);
 
-    const scopeVars = this.variables.get(scope);
-    if (!scopeVars || !scopeVars.has(varName)) throw new Error(`Variable "${varName}" is not defined in scope "${scope}"`);
+    const variable = this.scopeManager.getVariable(scope, varName);
+    if (!variable) throw new Error(`Variable "${varName}" is not defined in scope "${scope}"`);
 
-    const variable = scopeVars.get(varName)!;
     return this.resolveValue(variable.value, state, variable.context);
   }
 
@@ -436,13 +260,13 @@ export class Orchestrator {
     const moduleName = pathParts[1];
     const outputName = pathParts[2];
 
-    const currentScope = this.getAddressScope(context);
+    const currentScope = this.scopeManager.getScope(context);
     const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
+    const output = this.scopeManager.getOutput(childScope, outputName);
 
-    const scopeOutputs = this.outputsRegistry.get(childScope);
-    if (!scopeOutputs || !scopeOutputs.has(outputName)) throw new Error(`Output "${outputName}" not found in module "${childScope}"`);
+    if (output === undefined) throw new Error(`Output "${outputName}" not found in module "${childScope}"`);
 
-    return scopeOutputs.get(outputName);
+    return output;
   }
 
   private resolveDataSourceReference(pathParts: string[], context?: Address): unknown {
@@ -452,7 +276,7 @@ export class Orchestrator {
     const dataSourceName = pathParts[2];
     const attrName = pathParts[3];
 
-    const scope = this.getAddressScope(context);
+    const scope = this.scopeManager.getScope(context);
     const dataSourceKey = scope ? `${scope}.${dataSourceType}.${dataSourceName}` : `${dataSourceType}.${dataSourceName}`;
 
     const dataAttributes = this.dataSources.get(dataSourceKey);
@@ -496,53 +320,18 @@ export class Orchestrator {
     return attrValue;
   }
 
-  private getAddressScope(address?: Address): string {
-    if (!address) return '';
-    return address.modulePath.map((p) => `module.${p}`).join('.');
-  }
-
-  private async loadChildModule(stmt: Statement, rootDir: string, parentAddress: Address, moduleAccumulator: LoadedModule[]): Promise<LoadedResource[]> {
-    if (stmt.type !== 'Module') return [];
-
-    const moduleName = stmt.name;
-    const attributesMap = this.getAttributesMap(stmt.attributes);
-
-    const sourceValue = (attributesMap.source as { value: unknown } | undefined)?.value;
-    if (typeof sourceValue !== 'string') throw new Error(`Module "${moduleName}" is missing a valid "source" attribute.`);
-
-    const moduleDir = path.resolve(rootDir, sourceValue);
-    const moduleProgram = this.parseModuleFile(moduleDir);
-
-    const childAddress = new Address([...parentAddress.modulePath, moduleName], '', '');
-    this.initializeChildVariables(childAddress, attributesMap, parentAddress);
-
-    const { resources } = await this.loadModuleTree(moduleProgram, moduleDir, childAddress, moduleAccumulator);
-    return resources;
-  }
-
   private getAttributesMap(attributes: Record<string, AttributeValue> | undefined): Record<string, unknown> {
     const attributesMap: Record<string, unknown> = {};
     if (attributes) Object.assign(attributesMap, attributes);
     return attributesMap;
   }
 
-  private parseModuleFile(moduleDir: string): Statement[] {
-    const moduleFile = path.join(moduleDir, 'main.mf');
-    if (!fs.existsSync(moduleFile)) throw new Error(`Module source not found at: ${moduleFile}`);
-
-    const moduleContent = fs.readFileSync(moduleFile, 'utf8');
-    const parser = new Parser(new Lexer(moduleContent).tokenize());
-    return parser.parse() || [];
-  }
-
   private initializeChildVariables(childAddress: Address, attributesMap: Record<string, unknown>, parentAddress: Address): void {
-    const childScopeKey = this.getAddressScope(childAddress);
-    if (!this.variables.has(childScopeKey)) this.variables.set(childScopeKey, new Map());
-    const childVars = this.variables.get(childScopeKey)!;
+    const childScope = this.scopeManager.getScope(childAddress);
 
     for (const [key, attr] of Object.entries(attributesMap))
       if (key !== 'source')
-        childVars.set(key, {
+        this.scopeManager.setVariable(childScope, key, {
           value: attr,
           context: parentAddress,
         });

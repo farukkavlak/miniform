@@ -1,5 +1,5 @@
 import { IProvider, ISchema } from '@miniform/contracts';
-import { StateManager } from '@miniform/state';
+import { LocalBackend, StateManager } from '@miniform/state';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -59,7 +59,9 @@ describe('Orchestrator', () => {
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'orchestrator-test-'));
-    orchestrator = new Orchestrator(tmpDir);
+    const backend = new LocalBackend(tmpDir);
+    const stateManager = new StateManager(backend);
+    orchestrator = new Orchestrator(stateManager);
     mockProvider = new MockProvider();
     orchestrator.registerProvider(mockProvider);
   });
@@ -70,7 +72,9 @@ describe('Orchestrator', () => {
 
   describe('Provider Registration', () => {
     it('should register a provider', () => {
-      const newOrchestrator = new Orchestrator(tmpDir);
+      const backend = new LocalBackend(tmpDir);
+      const stateManager = new StateManager(backend);
+      const newOrchestrator = new Orchestrator(stateManager);
       expect(() => newOrchestrator.registerProvider(mockProvider)).not.toThrow();
     });
 
@@ -123,7 +127,8 @@ describe('Orchestrator', () => {
       await orchestrator.apply(config);
 
       // Read state directly
-      const stateManager = new StateManager(tmpDir);
+      const backend = new LocalBackend(tmpDir);
+      const stateManager = new StateManager(backend);
       const state = await stateManager.read();
 
       expect(state.resources['mock_resource.test']).toBeDefined();
@@ -250,7 +255,8 @@ describe('Orchestrator', () => {
       await orchestrator.apply(deleteConfig);
 
       // Check state
-      const stateManager = new StateManager(tmpDir);
+      const backend = new LocalBackend(tmpDir);
+      const stateManager = new StateManager(backend);
       const state = await stateManager.read();
 
       expect(state.resources['mock_resource.test']).toBeUndefined();
@@ -313,7 +319,8 @@ describe('Orchestrator', () => {
       const final = mockProvider.getCreatedResources();
 
       // Verify state matches config
-      const stateManager = new StateManager(tmpDir);
+      const backend = new LocalBackend(tmpDir);
+      const stateManager = new StateManager(backend);
       const state = await stateManager.read();
 
       // The provider should have exactly 3 resources

@@ -1,5 +1,6 @@
 /* eslint-disable camelcase */
 import { IProvider, ISchema } from '@miniform/contracts';
+import { LocalBackend, StateManager } from '@miniform/state';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -64,7 +65,9 @@ describe('Orchestrator: Advanced Features', () => {
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'orchestrator-test-'));
-    orchestrator = new Orchestrator(tmpDir);
+    const backend = new LocalBackend(tmpDir);
+    const stateManager = new StateManager(backend);
+    orchestrator = new Orchestrator(stateManager);
     mockProvider = new MockProvider();
     orchestrator.registerProvider(mockProvider);
   });
@@ -196,7 +199,7 @@ describe('Orchestrator: Advanced Features', () => {
         }
       `;
 
-      await expect(orchestrator.apply(config)).rejects.toThrow('not found in state');
+      await expect(orchestrator.apply(config)).rejects.toThrow('does not exist');
     });
   });
 

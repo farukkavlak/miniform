@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { LocalBackend } from '../src/backends/LocalBackend';
 import { IState, StateManager } from '../src/StateManager';
 
 describe('StateManager', () => {
@@ -12,7 +13,8 @@ describe('StateManager', () => {
   beforeEach(async () => {
     // Create a safe temporary directory for each test
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'miniform-state-test-'));
-    stateManager = new StateManager(tmpDir, 'test.state.json');
+    const backend = new LocalBackend(tmpDir, 'test.state.json');
+    stateManager = new StateManager(backend);
   });
 
   afterEach(async () => {
@@ -86,7 +88,8 @@ describe('StateManager', () => {
       // Use a non-existent directory for workingDir
       // This causes fs.writeFile to throw ENOENT, which is not EEXIST
       // So it should be re-thrown
-      const invalidManager = new StateManager('/non/existent/path/xyz/123');
+      const invalidBackend = new LocalBackend('/non/existent/path/xyz/123');
+      const invalidManager = new StateManager(invalidBackend);
       await expect(invalidManager.lock()).rejects.toThrow(/ENOENT/);
     });
 
