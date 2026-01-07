@@ -19,6 +19,10 @@ export class Graph<T> {
     return this.nodes.get(id);
   }
 
+  hasNode(id: string): boolean {
+    return this.nodes.has(id);
+  }
+
   /*
    * Returns nodes in topological order, grouped by layers for parallel execution.
    * Format: [['A', 'B'], ['C']] -> A and B can run in parallel, then C.

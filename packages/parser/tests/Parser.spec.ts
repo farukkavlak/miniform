@@ -106,6 +106,89 @@ describe('Miniform Parser', () => {
         value: ['a', 'b', 'c', 'd'],
       });
     });
+
+    it('should parse a simple variable block', () => {
+      const input = `
+        variable "environment" {
+          type = "string"
+          default = "dev"
+        }
+      `;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        type: 'Variable',
+        name: 'environment',
+        attributes: {
+          type: { type: 'String', value: 'string' },
+          default: { type: 'String', value: 'dev' },
+        },
+      });
+    });
+
+    it('should parse variable with number default', () => {
+      const input = `
+        variable "port" {
+          type = "number"
+          default = 8080
+        }
+      `;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].attributes.default).toEqual({ type: 'Number', value: 8080 });
+    });
+
+    it('should parse variable with boolean default', () => {
+      const input = `
+        variable "enabled" {
+          default = true
+        }
+      `;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].attributes.default).toEqual({ type: 'Boolean', value: true });
+    });
+
+    it('should parse multiple variables and resources', () => {
+      const input = `
+        variable "env" {
+          default = "prod"
+        }
+        resource "local_file" "config" {
+          path = "./config.txt"
+        }
+        variable "port" {
+          default = 3000
+        }
+      `;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result).toHaveLength(3);
+      expect(result[0].type).toBe('Variable');
+      expect(result[1].type).toBe('Resource');
+      expect(result[2].type).toBe('Variable');
+    });
+
+    it('should parse variable with description', () => {
+      const input = `
+        variable "region" {
+          type = "string"
+          default = "us-east-1"
+          description = "AWS region"
+        }
+      `;
+      const parser = makeParser(input);
+      const result = parser.parse();
+
+      expect(result[0].attributes.description).toEqual({ type: 'String', value: 'AWS region' });
+    });
   });
 
   describe('Error Cases', () => {

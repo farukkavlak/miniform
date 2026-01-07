@@ -14,6 +14,7 @@ export class Lexer {
   // Regex rules (Order matters!)
   private specs: TokenSpec[] = [
     { type: TokenType.Resource, regex: /^resource\b/ },
+    { type: TokenType.Variable, regex: /^variable\b/ },
     { type: TokenType.Boolean, regex: /^(true|false)\b/ },
     { type: TokenType.Identifier, regex: /^[A-Z_a-z]\w*/ },
     { type: TokenType.String, regex: /^"[^"]*"/ },

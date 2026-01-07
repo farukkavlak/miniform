@@ -1,11 +1,12 @@
 import { IProvider, ISchema } from '@miniform/contracts';
 import { Graph } from '@miniform/graph';
-import { Lexer, Parser } from '@miniform/parser';
+import { Lexer, Parser, ResourceBlock } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
 
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
+  private variables: Map<string, unknown> = new Map();
   private stateManager: StateManager;
 
   constructor(workingDir?: string) {
@@ -31,6 +32,18 @@ export class Orchestrator {
   }
 
   /**
+   * Process variable declarations from parsed program
+   */
+  private processVariables(program: ReturnType<Parser['parse']>): void {
+    this.variables.clear();
+    for (const stmt of program)
+      if (stmt.type === 'Variable') {
+        const defaultValue = stmt.attributes.default?.value;
+        this.variables.set(stmt.name, defaultValue);
+      }
+  }
+
+  /**
    * Generate an execution plan without applying it
    */
   async plan(configContent: string): Promise<PlanAction[]> {
@@ -39,10 +52,13 @@ export class Orchestrator {
     const parser = new Parser(lexer.tokenize());
     const program = parser.parse();
 
-    // 2. Load current state
+    // 2. Process variables
+    this.processVariables(program);
+
+    // 3. Load current state
     const currentState = await this.stateManager.read();
 
-    // 3. Generate execution plan
+    // 4. Generate execution plan
     // Fetch schemas for all resources in desired state
     const schemas: Record<string, ISchema> = {};
     for (const stmt of program)
@@ -69,13 +85,16 @@ export class Orchestrator {
     const parser = new Parser(lexer.tokenize());
     const program = parser.parse();
 
-    // 4. Build dependency graph
+    // 4. Build dependency graph with edges from resource references
     const graph = new Graph<null>();
     for (const stmt of program)
       if (stmt.type === 'Resource') {
         const key = `${stmt.resourceType}.${stmt.name}`;
         graph.addNode(key, null);
       }
+
+    // Add edges for resource references (dependencies)
+    for (const stmt of program) if (stmt.type === 'Resource') this.addResourceDependencies(stmt, graph);
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
 
@@ -86,8 +105,20 @@ export class Orchestrator {
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
     for (const action of deleteActions) await this.executeAction(action, currentState);
 
-    // 7. Write final state after all operations
+    // 7. Add variables to state
+    currentState.variables = Object.fromEntries(this.variables);
+
+    // 8. Write final state after all operations
     await this.stateManager.write(currentState);
+  }
+
+  private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>): void {
+    const key = `${stmt.resourceType}.${stmt.name}`;
+    for (const attr of Object.values(stmt.attributes))
+      if (attr.type === 'Reference' && attr.value[0] !== 'var') {
+        const depKey = `${attr.value[0]}.${attr.value[1]}`;
+        if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
+      }
   }
 
   private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState): Promise<void> {
@@ -139,11 +170,12 @@ export class Orchestrator {
   private async executeCreate(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
     if (!action.attributes) throw new Error('CREATE action missing attributes');
 
-    const inputs = this.convertAttributes(action.attributes);
+    const inputs = this.convertAttributes(action.attributes, currentState);
     await provider.validate(action.resourceType, inputs);
 
     const id = await provider.create(action.resourceType, inputs);
 
+    // eslint-disable-next-line require-atomic-updates
     currentState.resources[`${action.resourceType}.${action.name}`] = {
       id,
       type: 'Resource',
@@ -162,7 +194,7 @@ export class Orchestrator {
 
     for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
 
-    const inputs = this.convertAttributes(newAttributes);
+    const inputs = this.convertAttributes(newAttributes, currentState);
     await provider.validate(action.resourceType, inputs);
     await provider.update(action.id, action.resourceType, inputs);
 
@@ -177,13 +209,58 @@ export class Orchestrator {
     delete currentState.resources[`${action.resourceType}.${action.name}`];
   }
 
-  private convertAttributes(attributes: Record<string, unknown>): Record<string, unknown> {
+  private convertAttributes(attributes: Record<string, unknown>, state: IState): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(attributes))
       // AttributeValue has { type, value } structure
-      result[key] = value && typeof value === 'object' && 'value' in value ? value.value : value;
+      if (value && typeof value === 'object' && 'type' in value) {
+        const attrValue = value as { type: string; value: unknown };
+        if (attrValue.type === 'Reference') result[key] = this.resolveReference(attrValue.value as string[], state);
+        else if (attrValue.type === 'String') result[key] = this.interpolateString(attrValue.value as string, state);
+        else result[key] = attrValue.value;
+      } else result[key] = value;
 
     return result;
+  }
+
+  /**
+   * Interpolate ${...} expressions in a string
+   */
+  private interpolateString(value: string, state: IState): string {
+    // eslint-disable-next-line unicorn/prefer-string-replace-all
+    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
+      const path = expr.trim().split('.');
+      const resolved = this.resolveReference(path, state);
+      return String(resolved ?? '');
+    });
+  }
+
+  /**
+   * Resolve a reference path to its actual value
+   */
+  private resolveReference(path: string[], state: IState): unknown {
+    if (path.length < 2) throw new Error(`Invalid reference path: ${path.join('.')}`);
+
+    // Variable reference: var.name
+    if (path[0] === 'var') {
+      const varName = path[1];
+      if (!this.variables.has(varName)) throw new Error(`Variable "${varName}" is not defined`);
+      return this.variables.get(varName);
+    }
+
+    // Resource reference: type.name.attribute
+    if (path.length < 3) throw new Error(`Resource reference must include attribute: ${path.join('.')}`);
+
+    const resourceKey = `${path[0]}.${path[1]}`;
+    const resource = state.resources[resourceKey];
+    if (!resource) throw new Error(`Resource "${resourceKey}" not found in state`);
+
+    const attrName = path[2];
+    const attrValue = resource.attributes[attrName];
+    if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on resource "${resourceKey}"`);
+
+    if (attrValue && typeof attrValue === 'object' && 'value' in attrValue) return attrValue.value;
+    return attrValue;
   }
 }
