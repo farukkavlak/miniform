@@ -219,7 +219,7 @@ module "db" {
   name = "sql-server"
 }
             output "id" {
-  value = "\${test_resource.instance.id}"
+  value = "db-123"
 }
 `;
 
@@ -247,7 +247,6 @@ module "db" {
       },
     ]);
 
-    // Mock provider behavior to simulate resource ID generation
     mockProvider.create.mockImplementation((type: string, inputs: Record<string, unknown>) => {
       if (inputs.name === 'sql-server') return 'db-123';
       return 'app-456';

@@ -199,7 +199,7 @@ describe('Orchestrator: Advanced Features', () => {
         }
       `;
 
-      await expect(orchestrator.apply(config)).rejects.toThrow('not found in state');
+      await expect(orchestrator.apply(config)).rejects.toThrow('does not exist');
     });
   });
 
