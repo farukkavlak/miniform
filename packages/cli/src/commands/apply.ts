@@ -1,9 +1,10 @@
 import { Orchestrator } from '@miniform/orchestrator';
-import { PlanAction } from '@miniform/planner';
+import { PlanAction, PlanFile, validatePlanFile } from '@miniform/planner';
 import { LocalProvider } from '@miniform/provider-local';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -71,23 +72,72 @@ async function executeApply(cwd: string, configPath: string, autoConfirm: boolea
   }
 }
 
+async function executeApplyFromPlan(cwd: string, planFile: PlanFile, autoConfirm: boolean): Promise<void> {
+  const orchestrator = new Orchestrator(cwd);
+  orchestrator.registerProvider(new LocalProvider());
+
+  console.log(chalk.blue('Applying from saved plan...'));
+  console.log(chalk.gray(`Plan created: ${planFile.timestamp}`));
+
+  const configPath = path.join(cwd, 'main.mini');
+  const configContent = await fs.readFile(configPath, 'utf8');
+  const currentHash = crypto.createHash('sha256').update(configContent).digest('hex');
+
+  if (currentHash !== planFile.config_hash) {
+    console.log(chalk.yellow('\nWarning: Configuration has changed since plan was created.'));
+    console.log(chalk.yellow('The plan may be stale. Consider running `miniform plan` again.'));
+  }
+
+  displayActions(planFile.actions);
+
+  const confirmed = await confirmApply(autoConfirm);
+  if (!confirmed) {
+    console.log(chalk.yellow('Apply cancelled.'));
+    return;
+  }
+
+  console.log(chalk.blue('\napplying...'));
+  const outputs = await orchestrator.apply(configContent);
+  console.log(chalk.green('\nApply complete! Resources: ' + planFile.actions.length + ' processed.'));
+
+  if (Object.keys(outputs).length > 0) {
+    console.log(chalk.cyan('\nOutputs:'));
+    for (const [key, value] of Object.entries(outputs)) console.log(chalk.white(`  ${key} = ${JSON.stringify(value)}`));
+  }
+}
+
 export function createApplyCommand() {
   return new Command('apply')
     .description('Create or update infrastructure')
     .option('-y, --yes', 'Approve changes automatically')
-    .action(async (options) => {
+    .argument('[plan-file]', 'Plan file to apply (optional)')
+    .action(async (planFileArg: string | undefined, options) => {
       const cwd = process.cwd();
-      const configPath = path.join(cwd, 'main.mini');
 
       try {
-        await fs.access(configPath);
-      } catch {
-        console.error(chalk.red('Error: main.mini not found.'));
-        process.exit(1);
-      }
+        // Check if argument is a plan file (must be a string that doesn't start with -)
+        if (planFileArg && !planFileArg.startsWith('-')) {
+          const planContent = await fs.readFile(planFileArg, 'utf8');
+          const planData = JSON.parse(planContent);
 
-      try {
-        await executeApply(cwd, configPath, options.yes);
+          if (!validatePlanFile(planData)) {
+            console.error(chalk.red('Error: Invalid plan file format.'));
+            process.exit(1);
+          }
+
+          await executeApplyFromPlan(cwd, planData, options.yes);
+        } else {
+          const configPath = path.join(cwd, 'main.mini');
+
+          try {
+            await fs.access(configPath);
+          } catch {
+            console.error(chalk.red('Error: main.mini not found.'));
+            process.exit(1);
+          }
+
+          await executeApply(cwd, configPath, options.yes);
+        }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(chalk.red('Apply failed:'), message);

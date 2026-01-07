@@ -1,6 +1,7 @@
 import { IResource, ISchema } from '@miniform/contracts';
 import { AttributeValue, Program, ResourceBlock } from '@miniform/parser';
 import { IState } from '@miniform/state';
+import crypto from 'node:crypto';
 
 export type ActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'NO_OP';
 
@@ -11,6 +12,31 @@ export interface PlanAction {
   id?: string;
   attributes?: Record<string, AttributeValue>;
   changes?: Record<string, { old: AttributeValue | undefined; new: AttributeValue | undefined }>;
+}
+
+export interface PlanFile {
+  version: string;
+  timestamp: string;
+  config_hash: string;
+  actions: PlanAction[];
+}
+
+export function serializePlan(actions: PlanAction[], configContent: string): PlanFile {
+  const hash = crypto.createHash('sha256').update(configContent).digest('hex');
+
+  return {
+    version: '1.0',
+    timestamp: new Date().toISOString(),
+    config_hash: hash,
+    actions,
+  };
+}
+
+export function validatePlanFile(planFile: unknown): planFile is PlanFile {
+  if (!planFile || typeof planFile !== 'object') return false;
+
+  const pf = planFile as Partial<PlanFile>;
+  return typeof pf.version === 'string' && typeof pf.timestamp === 'string' && typeof pf.config_hash === 'string' && Array.isArray(pf.actions);
 }
 
 function calculateDiff(

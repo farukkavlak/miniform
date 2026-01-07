@@ -1,5 +1,5 @@
 import { Orchestrator } from '@miniform/orchestrator';
-import { PlanAction } from '@miniform/planner';
+import { PlanAction, serializePlan } from '@miniform/planner';
 import { LocalProvider } from '@miniform/provider-local';
 import chalk from 'chalk';
 import { Command } from 'commander';
@@ -37,7 +37,7 @@ function displayPlanSummary(actions: PlanAction[]): void {
   console.log(chalk.bold(`\nPlan: ${createCount} to add, ${updateCount} to change, ${deleteCount} to destroy.`));
 }
 
-async function executePlan(cwd: string, configPath: string): Promise<void> {
+async function executePlan(cwd: string, configPath: string, outFile?: string): Promise<void> {
   const configContent = await fs.readFile(configPath, 'utf8');
 
   const orchestrator = new Orchestrator(cwd);
@@ -60,27 +60,35 @@ async function executePlan(cwd: string, configPath: string): Promise<void> {
   }
 
   displayPlanSummary(actions);
+
+  if (outFile) {
+    const planFile = serializePlan(actions, configContent);
+    await fs.writeFile(outFile, JSON.stringify(planFile, null, 2), 'utf8');
+    console.log(chalk.green(`\nPlan saved to: ${outFile}`));
+  }
 }
 
 export function createPlanCommand() {
-  return new Command('plan').description('Show changes required by the current configuration').action(async () => {
-    const cwd = process.cwd();
-    const configPath = path.join(cwd, 'main.mini');
+  return new Command('plan')
+    .description('Show changes required by the current configuration')
+    .option('--out <file>', 'Save plan to file')
+    .action(async (options) => {
+      const cwd = process.cwd();
+      const configPath = path.join(cwd, 'main.mini');
 
-    try {
-      // Check if config exists
-      await fs.access(configPath);
-    } catch {
-      console.error(chalk.red('Error: main.mini not found in current directory.'));
-      process.exit(1);
-    }
+      try {
+        await fs.access(configPath);
+      } catch {
+        console.error(chalk.red('Error: main.mini not found in current directory.'));
+        process.exit(1);
+      }
 
-    try {
-      await executePlan(cwd, configPath);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(chalk.red('Planning failed:'), message);
-      process.exit(1);
-    }
-  });
+      try {
+        await executePlan(cwd, configPath, options.out);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(chalk.red('Planning failed:'), message);
+        process.exit(1);
+      }
+    });
 }
