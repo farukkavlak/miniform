@@ -14,9 +14,22 @@ export interface LoadedResource {
   block: ResourceBlock;
 }
 
+export interface LoadedModule {
+  address: Address;
+  program: any[];
+}
+
+interface VariableValue {
+  value: unknown;
+  context: Address; // Lexical scope where this value is defined
+}
+
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
-  private variables: Map<string, unknown> = new Map();
+  // Map<ScopeAddressString, Map<VarName, VariableValue>>
+  private variables: Map<string, Map<string, VariableValue>> = new Map();
+  // Map<ScopeAddressString, Map<OutputName, ResolvedValue>>
+  private outputsRegistry: Map<string, Map<string, unknown>> = new Map();
   private dataSources: Map<string, Record<string, unknown>> = new Map();
   private stateManager: StateManager;
 
@@ -43,19 +56,31 @@ export class Orchestrator {
   }
 
   /**
-   * Process variable declarations from parsed program
+   * Process variable declarations for a specific scope
    */
-  private processVariables(program: ReturnType<Parser['parse']>): void {
-    this.variables.clear();
-    for (const stmt of program)
+  private processVariables(program: ReturnType<Parser['parse']>, scopeAddress: Address): void {
+    const scope = this.getAddressScope(scopeAddress);
+    if (!this.variables.has(scope)) {
+      this.variables.set(scope, new Map());
+    }
+    const scopeVars = this.variables.get(scope)!;
+
+    for (const stmt of program) {
       if (stmt.type === 'Variable') {
         const defaultValue = stmt.attributes.default?.value;
-        this.variables.set(stmt.name, defaultValue);
+        // Only set default if not already set (e.g. by module inputs)
+        if (!scopeVars.has(stmt.name)) {
+          scopeVars.set(stmt.name, {
+            value: defaultValue,
+            context: scopeAddress // Defaults are defined in the module's own scope
+          });
+        }
       }
+    }
   }
 
-  private async processDataSources(program: ReturnType<Parser['parse']>, state: IState): Promise<void> {
-    this.dataSources.clear();
+  private async processDataSources(program: any[], state: IState, scopeAddress: Address): Promise<void> {
+    const scope = this.getAddressScope(scopeAddress);
 
     for (const stmt of program)
       if (stmt.type === 'Data') {
@@ -63,7 +88,7 @@ export class Orchestrator {
         if (!provider) throw new Error(`Provider for data source type "${stmt.dataSourceType}" not registered`);
 
         // Resolve inputs (attributes)
-        const inputs = this.convertAttributes(stmt.attributes, state);
+        const inputs = this.convertAttributes(stmt.attributes, state, scopeAddress);
 
         // Validate inputs
         await provider.validate(stmt.dataSourceType, inputs);
@@ -71,8 +96,9 @@ export class Orchestrator {
         // Read data
         const resolvedAttributes = await provider.read(stmt.dataSourceType, inputs);
 
-        // Store in dataSources map
-        this.dataSources.set(`${stmt.dataSourceType}.${stmt.name}`, resolvedAttributes);
+        // Store in dataSources map with scope prefix
+        const dataSourceKey = scope ? `${scope}.${stmt.dataSourceType}.${stmt.name}` : `${stmt.dataSourceType}.${stmt.name}`;
+        this.dataSources.set(dataSourceKey, resolvedAttributes);
       }
   }
 
@@ -80,11 +106,18 @@ export class Orchestrator {
    * Recursively loads modules and flattens resources
    */
   async loadModuleTree(
-    program: ReturnType<Parser['parse']>,
+    program: any[],
     rootDir: string,
-    parentAddress: Address
-  ): Promise<LoadedResource[]> {
+    parentAddress: Address,
+    moduleAccumulator: LoadedModule[] = []
+  ): Promise<{ resources: LoadedResource[]; modules: LoadedModule[] }> {
     const resources: LoadedResource[] = [];
+
+    // Add current module to accumulator
+    moduleAccumulator.push({ address: parentAddress, program });
+
+    // Initialize variables map for this scope
+    this.processVariables(program, parentAddress);
 
     for (const stmt of program) {
       if (stmt.type === 'Resource') {
@@ -97,18 +130,17 @@ export class Orchestrator {
       } else if (stmt.type === 'Module') {
         // Handle child module
         const moduleName = stmt.name;
-        // Create a proper attributes array for find or lookup in object
-        let sourceValue: any;
+        const rawAttributes = stmt.attributes || [];
+        const attributesMap: Record<string, any> = {};
 
-        if (Array.isArray(stmt.attributes)) {
-          const attr = stmt.attributes.find((a: any) => a.name === 'source');
-          sourceValue = attr ? attr.value : undefined;
+        if (Array.isArray(rawAttributes)) {
+          for (const a of rawAttributes) attributesMap[a.name] = a;
         } else {
-          // For resource blocks parser returns object map `attributes: { key: Value }`
-          // Check if parser behaves same for Module
-          const sourceAttr = stmt.attributes['source'];
-          sourceValue = sourceAttr ? sourceAttr.value : undefined;
+          Object.assign(attributesMap, rawAttributes);
         }
+
+        const sourceAttr = attributesMap['source'];
+        const sourceValue = sourceAttr ? sourceAttr.value : undefined;
 
         if (typeof sourceValue !== 'string') {
           throw new Error(`Module "${moduleName}" is missing a valid "source" attribute.`);
@@ -127,152 +159,243 @@ export class Orchestrator {
         const parser = new Parser(lexer.tokenize());
         const moduleProgram = parser.parse() || [];
 
-        const subResources = await this.loadModuleTree(
+        // Prepare child scope
+        const childAddress = new Address([...parentAddress.modulePath, moduleName], '', '');
+        const childScopeKey = this.getAddressScope(childAddress);
+
+        // Pass inputs to child scope variables
+        if (!this.variables.has(childScopeKey)) {
+          this.variables.set(childScopeKey, new Map());
+        }
+        const childVars = this.variables.get(childScopeKey)!;
+
+        // Process module attributes as inputs
+        for (const [key, attr] of Object.entries(attributesMap)) {
+          if (key === 'source') continue;
+          childVars.set(key, {
+            value: attr,
+            context: parentAddress // Defined in PARENT scope
+          });
+        }
+
+        const { resources: subResources } = await this.loadModuleTree(
           Array.isArray(moduleProgram) ? Array.from(moduleProgram) : [],
           moduleDir,
-          new Address([...parentAddress.modulePath, moduleName], '', '')
+          childAddress,
+          moduleAccumulator
         );
         resources.push(...subResources);
       }
     }
 
-    return resources;
+    return { resources, modules: moduleAccumulator };
   }
 
   /**
    * Generate an execution plan without applying it
    */
-  async plan(configContent: string): Promise<PlanAction[]> {
-    // 1. Parse config
+  async plan(configContent: string, rootDir: string = process.cwd()): Promise<PlanAction[]> {
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
-    const program = parser.parse();
+    const program = parser.parse() || [];
 
-    // 2. Process variables
-    this.processVariables(program);
+    this.variables.clear();
 
-    // 3. Load current state
+    const { resources: loadedResources } = await this.loadModuleTree(
+      Array.isArray(program) ? Array.from(program) : [],
+      rootDir,
+      new Address([], '', '')
+    );
+
     const currentState = await this.stateManager.read();
 
-    // 4. Process Data Sources (Resolve them before planning)
-    await this.processDataSources(program, currentState);
+    // 4. Process Data Sources for all modules
+    this.dataSources.clear();
+    const { modules: loadedModules } = await this.loadModuleTree(Array.isArray(program) ? Array.from(program) : [], rootDir, new Address([], '', ''));
+    for (const mod of loadedModules) {
+      await this.processDataSources(mod.program, currentState, mod.address);
+    }
 
-    // 5. Generate execution plan
-    // Fetch schemas for all resources in desired state
+    const virtualProgram: any[] = loadedResources.map(r => ({
+      ...r.block,
+      name: r.uniqueId,
+      modulePath: r.address.modulePath
+    }));
+
     const schemas: Record<string, ISchema> = {};
-    for (const stmt of program)
-      if (stmt.type === 'Resource' && !schemas[stmt.resourceType]) {
-        const schema = await this.getSchema(stmt.resourceType);
-        if (schema) schemas[stmt.resourceType] = schema;
+    for (const r of loadedResources) {
+      if (!schemas[r.block.resourceType]) {
+        const schema = await this.getSchema(r.block.resourceType);
+        if (schema) schemas[r.block.resourceType] = schema;
       }
+    }
 
-    return plan(program, currentState, schemas);
+    return plan(virtualProgram, currentState, schemas);
   }
 
-  /**
-   * Execute a configuration file
-   */
   async apply(configContent: string, rootDir: string = process.cwd()): Promise<Record<string, unknown>> {
-    // 1. Generate plan
-    const allActions = await this.plan(configContent);
-
-    // 2. Load current state (needed for graph building and execution)
+    const allActions = await this.plan(configContent, rootDir);
     const currentState = await this.stateManager.read();
 
-    // 3. Load all modules recursively and flatten resources
+    this.variables.clear();
+    this.outputsRegistry.clear();
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
     const mainProgram = parser.parse() || [];
-
-    // Safety check for mainProgram
     const safeProgram = Array.isArray(mainProgram) ? Array.from(mainProgram) : [];
 
-    const loadedResources = await this.loadModuleTree(safeProgram, rootDir, new Address([], '', ''));
+    const { resources: loadedResources, modules: loadedModules } = await this.loadModuleTree(safeProgram, rootDir, new Address([], '', ''));
 
-    // 4. Build dependency graph with edges from resource references
     const graph = new Graph<null>();
-
-    // Add all nodes
     for (const { uniqueId } of loadedResources) {
       graph.addNode(uniqueId, null);
     }
 
-    // Add edges for resource references (dependencies)
+    // Add output nodes to the graph
+    for (const mod of loadedModules) {
+      const scope = this.getAddressScope(mod.address);
+      for (const stmt of mod.program) {
+        if (stmt.type === 'Output') {
+          const outputKey = scope ? `${scope}.outputs.${stmt.name}` : `outputs.${stmt.name}`;
+          graph.addNode(outputKey, null);
+
+          // Track dependencies for this output (any resource it refers to)
+          this.addValueDependencies(stmt.value, graph, outputKey, mod.address);
+        }
+      }
+    }
+
+    // Add edges for resource references
     for (const { address, block } of loadedResources) {
       this.addResourceDependencies(block, graph, address);
     }
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
+    await this.executePlan(createUpdateActions, graph, currentState, loadedModules);
 
-    // 5. Execute plan in topological order (only CREATE/UPDATE)
-    await this.executePlan(createUpdateActions, graph, currentState);
-
-    // 6. Execute DELETE actions (not in graph since they're not in desired state)
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
     for (const action of deleteActions) await this.executeAction(action, currentState);
 
-    // 7. Add variables to state
     if (!currentState.variables) currentState.variables = {};
-    currentState.variables = Object.fromEntries(this.variables);
+    const varsObj: Record<string, Record<string, unknown>> = {};
+    for (const [scope, varMap] of this.variables.entries()) {
+      const simpleVarMap: Record<string, unknown> = {};
+      for (const [k, v] of varMap.entries()) {
+        simpleVarMap[k] = v.value;
+      }
+      varsObj[scope] = simpleVarMap;
+    }
+    currentState.variables = varsObj;
 
-    // 8. Write final state after all operations
     await this.stateManager.write(currentState);
 
-    // 9. Process and return outputs
-    return this.processOutputs(safeProgram, currentState);
+    return this.processOutputs(safeProgram, currentState, Address.root('', ''));
   }
 
-  private processOutputs(program: ReturnType<Parser['parse']>, state: IState): Record<string, unknown> {
+  private processOutputs(program: any[], state: IState, context: Address): Record<string, unknown> {
     const outputs: Record<string, unknown> = {};
-    for (const stmt of program)
+    const scope = this.getAddressScope(context);
+
+    for (const stmt of program) {
       if (stmt.type === 'Output') {
-        const resolved = this.resolveValue(stmt.value, state);
+        const resolved = this.resolveValue(stmt.value, state, context);
         outputs[stmt.name] = resolved;
+
+        // Store in registry
+        if (!this.outputsRegistry.has(scope)) {
+          this.outputsRegistry.set(scope, new Map());
+        }
+        this.outputsRegistry.get(scope)!.set(stmt.name, resolved);
       }
+    }
 
     return outputs;
   }
 
-  private resolveValue(value: { type: string; value: unknown }, state: IState): unknown {
-    if (value.type === 'Reference') return this.resolveReference(value.value as string[], state);
-    if (value.type === 'String') return this.interpolateString(value.value as string, state);
-    return value.value;
+  private resolveValue(value: { type: string; value: unknown } | unknown, state: IState, context?: Address): unknown {
+    if (value && typeof value === 'object' && 'type' in value) {
+      const typedVal = value as { type: string; value: unknown };
+      if (typedVal.type === 'Reference') return this.resolveReference(typedVal.value as string[], state, context);
+      if (typedVal.type === 'String') return this.interpolateString(typedVal.value as string, state, context);
+      return typedVal.value;
+    }
+    return value;
+  }
+
+  private convertAttributes(attributes: Record<string, unknown>, state: IState, context?: Address): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(attributes))
+      result[key] = this.resolveValue(value, state, context);
+    return result;
   }
 
   private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>, parsedAddress: Address): void {
     const key = parsedAddress.toString();
-    for (const attr of Object.values(stmt.attributes))
-      if (attr.type === 'Reference' && attr.value[0] !== 'var') {
-        const refParts = attr.value as string[];
-        let depKey = "";
-
-        if (refParts[0] === 'module') {
-          // Module ref (module.child.x)
-          const depString = refParts.slice(0, -1).join('.');
-          depKey = depString;
-        } else {
-          // Local ref
-          const depAddr = new Address(parsedAddress.modulePath, refParts[0], refParts[1]);
-          depKey = depAddr.toString();
-        }
-
-        if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
-      }
+    for (const attr of Object.values(stmt.attributes)) {
+      this.addValueDependencies(attr, graph, key, parsedAddress);
+    }
   }
 
-  private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState): Promise<void> {
+  private addValueDependencies(value: any, graph: Graph<null>, dependentKey: string, context: Address): void {
+    if (!value || typeof value !== 'object') return;
+
+    if (value.type === 'Reference') {
+      const refParts = value.value as string[];
+      if (refParts[0] === 'var') {
+        const scope = this.getAddressScope(context);
+        const variable = this.variables.get(scope)?.get(refParts[1]);
+        if (variable) {
+          this.addValueDependencies(variable.value, graph, dependentKey, variable.context);
+        }
+      } else if (refParts[0] === 'module') {
+        const moduleName = refParts[1];
+        const outputName = refParts[2];
+        const currentScope = this.getAddressScope(context);
+        const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
+
+        const depKey = `${childScope}.outputs.${outputName}`;
+        if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
+      } else {
+        const depAddr = new Address(context.modulePath, refParts[0], refParts[1]);
+        const depKey = depAddr.toString();
+        if (graph.hasNode(depKey)) graph.addEdge(depKey, dependentKey);
+      }
+    } else if (value.type === 'String') {
+      const exprs = (value.value as string).match(/\${([^}]+)}/g) || [];
+      for (const expr of exprs) {
+        const path = expr.slice(2, -1).trim().split('.');
+        this.addValueDependencies({ type: 'Reference', value: path }, graph, dependentKey, context);
+      }
+    }
+  }
+
+  private async executePlan(actions: PlanAction[], graph: Graph<null>, currentState: IState, loadedModules: LoadedModule[]): Promise<void> {
     const layers = graph.topologicalSort();
 
-    for (const layer of layers)
-      // Execute all actions in this layer in parallel
+    for (const layer of layers) {
       await Promise.all(
-        layer.map(async (resourceKey: string) => {
-          const action = actions.find((a) => new Address(a.modulePath || [], a.resourceType, a.name).toString() === resourceKey);
+        layer.map(async (key: string) => {
+          if (key.includes('.outputs.')) {
+            const parts = key.split('.outputs.');
+            const scope = parts[0];
+            const mod = loadedModules.find(m => this.getAddressScope(m.address) === scope);
+            if (mod) {
+              this.processOutputs(mod.program, currentState, mod.address);
+            }
+            return;
+          }
+
+          const action = actions.find((a) => {
+            const actionKey = new Address(a.modulePath || [], a.resourceType, a.name).toString();
+            return actionKey === key;
+          });
+
           if (!action) return;
 
           await this.executeAction(action, currentState);
         })
       );
+    }
   }
 
   private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
@@ -284,44 +407,41 @@ export class Orchestrator {
         await this.executeCreate(action, provider, currentState);
         break;
       }
-
       case 'UPDATE': {
         await this.executeUpdate(action, provider, currentState);
         break;
       }
-
       case 'DELETE': {
         await this.executeDelete(action, provider, currentState);
         break;
       }
-
-      case 'NO_OP': {
-        break;
-      }
-
-      default: {
-        throw new Error(`Unknown action type: ${action.type}`);
-      }
+      case 'NO_OP': break;
+      default: throw new Error(`Unknown action type: ${action.type}`);
     }
   }
 
   private async executeCreate(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
     if (!action.attributes) throw new Error('CREATE action missing attributes');
 
-    const inputs = this.convertAttributes(action.attributes, currentState);
+    let contextAddress: Address;
+    try {
+      contextAddress = Address.parse(action.name);
+    } catch {
+      contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
+    }
+
+    const inputs = this.convertAttributes(action.attributes, currentState, contextAddress);
     await provider.validate(action.resourceType, inputs);
 
     const id = await provider.create(action.resourceType, inputs);
-
     const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
 
-    // eslint-disable-next-line require-atomic-updates
     currentState.resources[key] = {
       id,
       type: 'Resource',
       resourceType: action.resourceType,
       name: action.name,
-      attributes: inputs, // Store resolved inputs, not method attributes with placeholders
+      attributes: inputs,
     };
   }
 
@@ -335,76 +455,89 @@ export class Orchestrator {
 
     for (const [key, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[key] = change.new;
 
-    const inputs = this.convertAttributes(newAttributes, currentState);
+    let contextAddress: Address;
+    try {
+      contextAddress = Address.parse(key);
+    } catch {
+      contextAddress = new Address(action.modulePath || [], action.resourceType, action.name);
+    }
+    const inputs = this.convertAttributes(newAttributes, currentState, contextAddress);
 
     await provider.validate(action.resourceType, inputs);
     await provider.update(action.id, action.resourceType, inputs);
 
-    currentResource.attributes = inputs; // Update state with resolved values
+    currentResource.attributes = inputs;
   }
 
   private async executeDelete(action: PlanAction, provider: IProvider, currentState: IState): Promise<void> {
     if (!action.id) throw new Error('DELETE action missing id');
 
     await provider.delete(action.id, action.resourceType);
-
     const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
     delete currentState.resources[key];
   }
 
-  private convertAttributes(attributes: Record<string, unknown>, state: IState): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-
-    for (const [key, value] of Object.entries(attributes))
-      // AttributeValue has { type, value } structure
-      if (value && typeof value === 'object' && 'type' in value) {
-        const attrValue = value as { type: string; value: unknown };
-        if (attrValue.type === 'Reference') result[key] = this.resolveReference(attrValue.value as string[], state);
-        else if (attrValue.type === 'String') result[key] = this.interpolateString(attrValue.value as string, state);
-        else result[key] = attrValue.value;
-      } else result[key] = value;
-
-    return result;
-  }
-
-  /**
-   * Interpolate ${...} expressions in a string
-   */
-  private interpolateString(value: string, state: IState): string {
-    // eslint-disable-next-line unicorn/prefer-string-replace-all
+  private interpolateString(value: string, state: IState, context?: Address): string {
     return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
       const path = expr.trim().split('.');
-      const resolved = this.resolveReference(path, state);
+      const resolved = this.resolveReference(path, state, context);
       return String(resolved ?? '');
     });
   }
 
-  /**
-   * Resolve a reference path to its actual value
-   */
-  private resolveReference(path: string[], state: IState): unknown {
+  private resolveReference(path: string[], state: IState, context?: Address): unknown {
     if (path.length < 2) throw new Error(`Invalid reference path: ${path.join('.')}`);
 
-    if (path[0] === 'var') return this.resolveVariableReference(path);
-    if (path[0] === 'data') return this.resolveDataSourceReference(path);
-    return this.resolveResourceReference(path, state);
+    if (path[0] === 'var') return this.resolveVariableReference(path, state, context);
+    if (path[0] === 'data') return this.resolveDataSourceReference(path, context);
+    if (path[0] === 'module') return this.resolveModuleOutputReference(path, state, context);
+    return this.resolveResourceReference(path, state, context);
   }
 
-  private resolveVariableReference(path: string[]): unknown {
+  private resolveVariableReference(path: string[], state: IState, context?: Address): unknown {
     const varName = path[1];
-    if (!this.variables.has(varName)) throw new Error(`Variable "${varName}" is not defined`);
-    return this.variables.get(varName);
+    const scope = this.getAddressScope(context);
+
+    const scopeVars = this.variables.get(scope);
+    if (!scopeVars || !scopeVars.has(varName)) {
+      throw new Error(`Variable "${varName}" is not defined in scope "${scope}"`);
+    }
+
+    const variable = scopeVars.get(varName)!;
+    return this.resolveValue(variable.value, state, variable.context);
   }
 
-  private resolveDataSourceReference(path: string[]): unknown {
+  private resolveModuleOutputReference(path: string[], state: IState, context?: Address): unknown {
+    if (path.length < 3) throw new Error(`Module output reference must include output name: ${path.join('.')}`);
+
+    const moduleName = path[1];
+    const outputName = path[2];
+
+    const currentScope = this.getAddressScope(context);
+    const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
+
+    const scopeOutputs = this.outputsRegistry.get(childScope);
+    if (!scopeOutputs || !scopeOutputs.has(outputName)) {
+      throw new Error(`Output "${outputName}" not found in module "${childScope}"`);
+    }
+
+    return scopeOutputs.get(outputName);
+  }
+
+  private resolveDataSourceReference(path: string[], context?: Address): unknown {
     if (path.length < 4) throw new Error(`Data source reference must include attribute: ${path.join('.')}`);
 
-    const dataSourceKey = `${path[1]}.${path[2]}`;
+    const dataSourceType = path[1];
+    const dataSourceName = path[2];
+    const attrName = path[3];
+
+    const scope = this.getAddressScope(context);
+    const dataSourceKey = scope ? `${scope}.${dataSourceType}.${dataSourceName}` : `${dataSourceType}.${dataSourceName}`;
+
     const dataAttributes = this.dataSources.get(dataSourceKey);
 
     if (!dataAttributes) throw new Error(`Data source "${dataSourceKey}" not found (or not resolved yet)`);
 
-    const attrName = path[3];
     const attrValue = dataAttributes[attrName];
 
     if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on data source "${dataSourceKey}"`);
@@ -412,32 +545,45 @@ export class Orchestrator {
     return attrValue;
   }
 
-  private resolveResourceReference(path: string[], state: IState): unknown {
+  private resolveResourceReference(path: string[], state: IState, context?: Address): unknown {
     if (path.length < 3) throw new Error(`Resource reference must include attribute: ${path.join('.')}`);
-
-    // Parse path into Address + Attribute
-    // path format: [...modulePath, type, name, attribute]
 
     const attributeName = path[path.length - 1];
     const addressParts = path.slice(0, -1);
-    const addressString = addressParts.join('.');
 
     try {
-      const address = Address.parse(addressString);
+      let address: Address;
+      if (addressParts[0] === 'module') {
+        address = Address.parse(addressParts.join('.'));
+      } else {
+        address = new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
+      }
+
       const resourceKey = address.toString();
-
       const resource = state.resources[resourceKey];
-      if (!resource) throw new Error(`Resource "${resourceKey}" not found in state`);
+      if (!resource) {
+        throw new Error(`Resource "${resourceKey}" not found in state`);
+      }
 
-      const attrValue = resource.attributes[attributeName];
-      if (attrValue === undefined) throw new Error(`Attribute "${attributeName}" not found on resource "${resourceKey}"`);
+      let attrValue: any = (resource as any)[attributeName];
+      if (attrValue === undefined) {
+        attrValue = resource.attributes[attributeName];
+      }
+
+      if (attrValue === undefined) {
+        throw new Error(`Attribute "${attributeName}" not found on resource "${resourceKey}"`);
+      }
 
       if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
 
       return attrValue;
     } catch (e) {
-      // If Address.parse fails, maybe it's not a valid resource address
       throw new Error(`Invalid resource reference "${path.join('.')}": ${(e as Error).message}`);
     }
+  }
+
+  private getAddressScope(address?: Address): string {
+    if (!address) return '';
+    return address.modulePath.map(p => `module.${p}`).join('.');
   }
 }
