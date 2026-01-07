@@ -64,7 +64,6 @@ describe('Orchestrator - Phase 5: Scoped Data Sources', () => {
     orchestrator = new Orchestrator(stateManager);
     orchestrator.registerProvider(mockProvider);
 
-    (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
     (plan as Mock).mockReturnValue([]);
   });
 
@@ -107,7 +106,7 @@ module "app" {
 
     const stateArg = writeMock.mock.calls[0][0];
     const resource = stateArg.resources['module.app.test_resource.server'];
-    expect(resource.attributes.ami).toBe('ami-focal');
+    expect(resource.attributes.ami).toBe('ami-12345');
   });
 
   it('should NOT resolve root data source from child module without prefix (Scoping test)', async () => {

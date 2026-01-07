@@ -65,10 +65,6 @@ describe('Orchestrator - Module Loading', () => {
     orchestrator = new Orchestrator(stateManager);
     orchestrator.registerProvider(mockProvider);
 
-    // Mock path.resolve for module loading
-    (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
-
-    // Ensure plan returns empty array
     (plan as Mock).mockReturnValue([]);
   });
 

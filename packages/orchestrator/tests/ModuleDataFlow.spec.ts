@@ -68,10 +68,6 @@ describe('Orchestrator - Phase 4: Data Flow', () => {
     orchestrator = new Orchestrator(stateManager);
     orchestrator.registerProvider(mockProvider);
 
-    // Mock path.resolve
-    (path.resolve as Mock).mockImplementation((...args: string[]) => args.join('/'));
-    (path.join as Mock).mockImplementation((...args: string[]) => args.join('/'));
-
     // Ensure plan returns empty array by default
     (plan as Mock).mockReturnValue([]);
   });
