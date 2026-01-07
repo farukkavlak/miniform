@@ -484,7 +484,7 @@ export class Orchestrator {
     return new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
   }
 
-  private getResolvedAttribute(resource: { id?: string; attributes: Record<string, any> }, attributeName: string, fullPath: string): unknown {
+  private getResolvedAttribute(resource: { id?: string; attributes: Record<string, unknown> }, attributeName: string, fullPath: string): unknown {
     let attrValue: unknown = resource.attributes[attributeName];
     if (attrValue === undefined && attributeName === 'id') attrValue = resource.id;
 
