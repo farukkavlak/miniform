@@ -13,5 +13,11 @@ export interface VariableBlock {
   attributes: Record<string, AttributeValue>; // type, default, description
 }
 
-export type Statement = ResourceBlock | VariableBlock;
+export interface OutputBlock {
+  type: 'Output';
+  name: string;
+  value: AttributeValue;
+}
+
+export type Statement = ResourceBlock | VariableBlock | OutputBlock;
 export type Program = Statement[];
