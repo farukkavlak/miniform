@@ -8,24 +8,24 @@ import { IResolver } from './IResolver';
  * Resolves data source references (data.type.name.attribute)
  */
 export class DataSourceResolver implements IResolver {
-    constructor(
-        private dataSources: Map<string, Record<string, unknown>>,
-        private scopeManager: ScopeManager
-    ) { }
+  constructor(
+    private dataSources: Map<string, Record<string, unknown>>,
+    private scopeManager: ScopeManager
+  ) {}
 
-    resolve(pathParts: string[], context: Address, _state: IState): unknown {
-        if (pathParts.length < 4) throw new Error(`Data source reference must include attribute: ${pathParts.join('.')}`);
+  resolve(pathParts: string[], context: Address): unknown {
+    if (pathParts.length < 4) throw new Error(`Data source reference must include attribute: ${pathParts.join('.')}`);
 
-        const [, dataSourceType, dataSourceName, attrName] = pathParts;
-        const scope = this.scopeManager.getScope(context);
-        const key = scope ? `${scope}.${dataSourceType}.${dataSourceName}` : `${dataSourceType}.${dataSourceName}`;
+    const [, dataSourceType, dataSourceName, attrName] = pathParts;
+    const scope = this.scopeManager.getScope(context);
+    const key = scope ? `${scope}.${dataSourceType}.${dataSourceName}` : `${dataSourceType}.${dataSourceName}`;
 
-        const dataAttributes = this.dataSources.get(key);
-        if (!dataAttributes) throw new Error(`Data source "${key}" not found (or not resolved yet)`);
+    const dataAttributes = this.dataSources.get(key);
+    if (!dataAttributes) throw new Error(`Data source "${key}" not found (or not resolved yet)`);
 
-        const attrValue = dataAttributes[attrName];
-        if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on data source "${key}"`);
+    const attrValue = dataAttributes[attrName];
+    if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on data source "${key}"`);
 
-        return attrValue;
-    }
+    return attrValue;
+  }
 }

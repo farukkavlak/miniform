@@ -7,5 +7,5 @@ import { Address } from '../Address';
  * Each resolver handles a specific type of reference (var, data, module, resource).
  */
 export interface IResolver {
-    resolve(pathParts: string[], context: Address, state: IState): unknown;
+  resolve(pathParts: string[], context: Address, state: IState): unknown;
 }

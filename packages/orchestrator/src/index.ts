@@ -65,13 +65,13 @@ export class Orchestrator {
 
     for (const stmt of program)
       if (stmt.type === 'Variable') {
-        const value = stmt.default !== undefined ? stmt.default : null;
-        this.scopeManager.setVariable(scope, stmt.name, { value, context: address });
+        const defaultValue = stmt.attributes.default?.value;
+        if (defaultValue !== undefined) this.scopeManager.setVariable(scope, stmt.name, { value: defaultValue, context: address });
       }
   }
 
   private async processDataSources(program: Statement[], state: IState, scopeAddress: Address): Promise<void> {
-    const scope = this.getAddressScope(scopeAddress);
+    const scope = this.scopeManager.getScope(scopeAddress);
 
     for (const stmt of program)
       if (stmt.type === 'Data') {
@@ -134,7 +134,7 @@ export class Orchestrator {
     const parser = new Parser(lexer.tokenize());
     const program = parser.parse() || [];
 
-    this.variables.clear();
+    this.scopeManager.clear();
 
     const { resources: loadedResources } = await this.loadModuleTree(Array.isArray(program) ? Array.from(program) : [], rootDir, new Address([], '', ''));
 
@@ -164,8 +164,7 @@ export class Orchestrator {
     const allActions = await this.plan(configContent, rootDir);
     const currentState = await this.stateManager.read();
 
-    this.variables.clear();
-    this.outputsRegistry.clear();
+    this.scopeManager.clear();
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
     const mainProgram = parser.parse() || [];
@@ -194,16 +193,13 @@ export class Orchestrator {
 
   private processOutputs(program: Statement[], state: IState, context: Address): Record<string, unknown> {
     const outputs: Record<string, unknown> = {};
-    const scope = this.getAddressScope(context);
+    const scope = this.scopeManager.getScope(context);
 
     for (const stmt of program)
       if (stmt.type === 'Output') {
         const resolved = this.resolveValue(stmt.value, state, context);
         outputs[stmt.name] = resolved;
-
-        // Store in registry
-        if (!this.outputsRegistry.has(scope)) this.outputsRegistry.set(scope, new Map());
-        this.outputsRegistry.get(scope)!.set(stmt.name, resolved);
+        this.scopeManager.setOutput(scope, stmt.name, resolved);
       }
 
     return outputs;
@@ -240,13 +236,13 @@ export class Orchestrator {
 
   private addReferenceDependencies(refParts: string[], graph: Graph<null>, dependentKey: string, context: Address): void {
     if (refParts[0] === 'var') {
-      const scope = this.getAddressScope(context);
-      const variable = this.variables.get(scope)?.get(refParts[1]);
+      const scope = this.scopeManager.getScope(context);
+      const variable = this.scopeManager.getVariable(scope, refParts[1]);
       if (variable) this.addValueDependencies(variable.value, graph, dependentKey, variable.context);
     } else if (refParts[0] === 'module') {
       const moduleName = refParts[1];
       const outputName = refParts[2];
-      const currentScope = this.getAddressScope(context);
+      const currentScope = this.scopeManager.getScope(context);
       const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
 
       const depKey = `${childScope}.outputs.${outputName}`;
@@ -288,7 +284,7 @@ export class Orchestrator {
     for (const { uniqueId } of loadedResources) graph.addNode(uniqueId, null);
 
     for (const mod of loadedModules) {
-      const scope = this.getAddressScope(mod.address);
+      const scope = this.scopeManager.getScope(mod.address);
       for (const stmt of mod.program)
         if (stmt.type === 'Output') {
           const outputKey = scope ? `${scope}.outputs.${stmt.name}` : `outputs.${stmt.name}`;
@@ -305,13 +301,13 @@ export class Orchestrator {
   private resolveOutputByKey(key: string, loadedModules: LoadedModule[], currentState: IState): void {
     const parts = key.split('.outputs.');
     const scope = parts[0];
-    const mod = loadedModules.find((m) => this.getAddressScope(m.address) === scope);
+    const mod = loadedModules.find((m) => this.scopeManager.getScope(m.address) === scope);
     if (mod) this.processOutputs(mod.program, currentState, mod.address);
   }
 
   private syncStateVariables(currentState: IState): void {
     const varsObj: Record<string, Record<string, unknown>> = {};
-    for (const [scope, varMap] of this.variables.entries()) {
+    for (const [scope, varMap] of this.scopeManager.getAllVariables().entries()) {
       const simpleVarMap: Record<string, unknown> = {};
       for (const [k, v] of varMap.entries()) simpleVarMap[k] = v.value;
       varsObj[scope] = simpleVarMap;
@@ -416,12 +412,11 @@ export class Orchestrator {
 
   private resolveVariableReference(pathParts: string[], state: IState, context?: Address): unknown {
     const varName = pathParts[1];
-    const scope = this.getAddressScope(context);
+    const scope = this.scopeManager.getScope(context);
 
-    const scopeVars = this.variables.get(scope);
-    if (!scopeVars || !scopeVars.has(varName)) throw new Error(`Variable "${varName}" is not defined in scope "${scope}"`);
+    const variable = this.scopeManager.getVariable(scope, varName);
+    if (!variable) throw new Error(`Variable "${varName}" is not defined in scope "${scope}"`);
 
-    const variable = scopeVars.get(varName)!;
     return this.resolveValue(variable.value, state, variable.context);
   }
 
@@ -431,13 +426,13 @@ export class Orchestrator {
     const moduleName = pathParts[1];
     const outputName = pathParts[2];
 
-    const currentScope = this.getAddressScope(context);
+    const currentScope = this.scopeManager.getScope(context);
     const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
+    const output = this.scopeManager.getOutput(childScope, outputName);
 
-    const scopeOutputs = this.outputsRegistry.get(childScope);
-    if (!scopeOutputs || !scopeOutputs.has(outputName)) throw new Error(`Output "${outputName}" not found in module "${childScope}"`);
+    if (output === undefined) throw new Error(`Output "${outputName}" not found in module "${childScope}"`);
 
-    return scopeOutputs.get(outputName);
+    return output;
   }
 
   private resolveDataSourceReference(pathParts: string[], context?: Address): unknown {
@@ -447,7 +442,7 @@ export class Orchestrator {
     const dataSourceName = pathParts[2];
     const attrName = pathParts[3];
 
-    const scope = this.getAddressScope(context);
+    const scope = this.scopeManager.getScope(context);
     const dataSourceKey = scope ? `${scope}.${dataSourceType}.${dataSourceName}` : `${dataSourceType}.${dataSourceName}`;
 
     const dataAttributes = this.dataSources.get(dataSourceKey);
@@ -491,11 +486,6 @@ export class Orchestrator {
     return attrValue;
   }
 
-  private getAddressScope(address?: Address): string {
-    if (!address) return '';
-    return address.modulePath.map((p) => `module.${p}`).join('.');
-  }
-
   private async loadChildModule(stmt: Statement, rootDir: string, parentAddress: Address, moduleAccumulator: LoadedModule[]): Promise<LoadedResource[]> {
     if (stmt.type !== 'Module') return [];
 
@@ -531,13 +521,11 @@ export class Orchestrator {
   }
 
   private initializeChildVariables(childAddress: Address, attributesMap: Record<string, unknown>, parentAddress: Address): void {
-    const childScopeKey = this.getAddressScope(childAddress);
-    if (!this.variables.has(childScopeKey)) this.variables.set(childScopeKey, new Map());
-    const childVars = this.variables.get(childScopeKey)!;
+    const childScope = this.scopeManager.getScope(childAddress);
 
     for (const [key, attr] of Object.entries(attributesMap))
       if (key !== 'source')
-        childVars.set(key, {
+        this.scopeManager.setVariable(childScope, key, {
           value: attr,
           context: parentAddress,
         });
