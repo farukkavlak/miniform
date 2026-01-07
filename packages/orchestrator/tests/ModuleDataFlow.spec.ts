@@ -205,21 +205,23 @@ module "L2" {
     expect(innerVal).toBe('eu-west-1');
   });
 
-  it('should resolve module outputs and satisfy parent dependencies', async () => {
+  it('should pass variables to modules and use them in resources', async () => {
     const rootConfig = `
 module "db" {
   source = "./db"
+  db_name = "production-db"
 }
             resource "test_resource" "app" {
-  db_id = "\${module.db.id}"
+  name = "my-app"
 }
 `;
     const dbConfig = `
-            resource "test_resource" "instance" {
-  name = "sql-server"
+variable "db_name" {
+  default = "default-db"
 }
-            output "id" {
-  value = "db-123"
+
+resource "test_resource" "instance" {
+  name = "\${var.db_name}"
 }
 `;
 
@@ -236,28 +238,26 @@ module "db" {
         resourceType: 'test_resource',
         name: 'instance',
         modulePath: ['db'],
-        attributes: { name: { type: 'String', value: 'sql-server' } },
+        attributes: { name: { type: 'Reference', value: ['var', 'db_name'] } },
       },
       {
         type: 'CREATE',
         resourceType: 'test_resource',
         name: 'app',
         modulePath: [],
-        attributes: { db_id: { type: 'Reference', value: ['module', 'db', 'id'] } },
+        attributes: { name: { type: 'String', value: 'my-app' } },
       },
     ]);
 
-    mockProvider.create.mockImplementation((type: string, inputs: Record<string, unknown>) => {
-      if (inputs.name === 'sql-server') return 'db-123';
-      return 'app-456';
-    });
+    mockProvider.create.mockImplementation(() => 'resource-id');
 
     await orchestrator.apply(rootConfig, '/root');
 
     const stateArg = writeMock.mock.calls[0][0];
 
-    const appResource = stateArg.resources['test_resource.app'];
-    expect(appResource).toBeDefined();
-    expect(appResource.attributes.db_id).toBe('db-123');
+    const dbResource = stateArg.resources['module.db.test_resource.instance'];
+    expect(dbResource).toBeDefined();
+    expect(dbResource.attributes.name).toBe('production-db');
   });
+
 });

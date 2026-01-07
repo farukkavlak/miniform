@@ -101,9 +101,16 @@
 - [ ] **Provider Architecture Refactor**
   - [ ] Move from Singleton Provider to Instance-based Providers
   - [ ] Support provider aliases (multi-region/account support)
-- [ ] **State Management Abstraction**
-  - [ ] Interface `IStateBackend` (Remote State support)
-  - [ ] Decouple `StateManager` from local `fs`
+- [x] **State Management Abstraction**
+  - [x] Interface `IStateBackend` (Remote State support)
+  - [x] Decouple `StateManager` from local `fs`
+  - [x] Implement `LocalBackend` for file system operations
+- [x] **Orchestrator Refactoring**
+  - [x] Extract `ReferenceResolver` with Strategy pattern
+  - [x] Extract `ModuleLoader` component
+  - [x] Extract `ActionExecutor` component
+  - [x] Extract `DependencyGraphBuilder` component
+  - [x] Reduce Orchestrator from 535 to 325 lines (-39%)
 - [x] **Resource Addressing (Modules)**
   - [x] Implement hierarchical addressing (tree structure)
   - [x] Refactor resource map to support nested modules
