@@ -71,7 +71,7 @@ async function executePlan(cwd: string, configPath: string, outFile?: string): P
 export function createPlanCommand() {
   return new Command('plan')
     .description('Show changes required by the current configuration')
-    .option('-out <file>', 'Save plan to file')
+    .option('--out <file>', 'Save plan to file')
     .action(async (options) => {
       const cwd = process.cwd();
       const configPath = path.join(cwd, 'main.mini');

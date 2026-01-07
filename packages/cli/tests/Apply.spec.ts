@@ -222,6 +222,74 @@ describe('CLI: apply command', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should abort if confirmation declined', async () => {
+      const planFileContent = JSON.stringify({
+        version: '1.0',
+        timestamp: '2024-01-01T00:00:00Z',
+        config_hash: 'test-hash',
+        actions: [{ type: 'CREATE', resourceType: 'test', name: 't' }],
+      });
+
+      vi.mocked(fs.readFile).mockImplementation(async (path) => {
+        if (String(path).includes('plan.json')) return planFileContent;
+        return 'config content';
+      });
+
+      const applyMock = vi.fn().mockResolvedValue({});
+
+      vi.mocked(Orchestrator).mockImplementation(function () {
+        return {
+          registerProvider: vi.fn(),
+          apply: applyMock,
+        } as Partial<Orchestrator> as Orchestrator;
+      });
+
+      vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: false });
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await createApplyCommand().parseAsync(['node', 'miniform', 'plan.json']);
+
+      expect(applyMock).not.toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith('Apply cancelled.');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should display outputs when returned from plan apply', async () => {
+      const planFileContent = JSON.stringify({
+        version: '1.0',
+        timestamp: '2024-01-01T00:00:00Z',
+        config_hash: 'test-hash',
+        actions: [{ type: 'CREATE', resourceType: 'test', name: 't' }],
+      });
+
+      vi.mocked(fs.readFile).mockImplementation(async (path) => {
+        if (String(path).includes('plan.json')) return planFileContent;
+        return 'config content';
+      });
+
+      const applyMock = vi.fn().mockResolvedValue({
+        plan_output: 'value',
+      });
+
+      vi.mocked(Orchestrator).mockImplementation(function () {
+        return {
+          registerProvider: vi.fn(),
+          apply: applyMock,
+        } as Partial<Orchestrator> as Orchestrator;
+      });
+
+      vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: true });
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await createApplyCommand().parseAsync(['node', 'miniform', 'plan.json']);
+
+      expect(applyMock).toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Outputs:'));
+
+      consoleSpy.mockRestore();
+    });
+
     it('should reject invalid plan file', async () => {
       vi.mocked(fs.readFile).mockResolvedValue('{ "invalid": true }');
 
