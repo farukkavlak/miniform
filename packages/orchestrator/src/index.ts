@@ -60,21 +60,18 @@ export class Orchestrator {
    */
   private processVariables(program: ReturnType<Parser['parse']>, scopeAddress: Address): void {
     const scope = this.getAddressScope(scopeAddress);
-    if (!this.variables.has(scope)) {
-      this.variables.set(scope, new Map());
-    }
+    if (!this.variables.has(scope)) this.variables.set(scope, new Map());
     const scopeVars = this.variables.get(scope)!;
 
     for (const stmt of program) {
       if (stmt.type === 'Variable') {
         const defaultValue = stmt.attributes.default?.value;
         // Only set default if not already set (e.g. by module inputs)
-        if (!scopeVars.has(stmt.name)) {
+        if (!scopeVars.has(stmt.name))
           scopeVars.set(stmt.name, {
             value: defaultValue,
             context: scopeAddress, // Defaults are defined in the module's own scope
           });
-        }
       }
     }
   }
@@ -82,7 +79,7 @@ export class Orchestrator {
   private async processDataSources(program: any[], state: IState, scopeAddress: Address): Promise<void> {
     const scope = this.getAddressScope(scopeAddress);
 
-    for (const stmt of program)
+    for (const stmt of program) {
       if (stmt.type === 'Data') {
         const provider = this.providers.get(stmt.dataSourceType);
         if (!provider) throw new Error(`Provider for data source type "${stmt.dataSourceType}" not registered`);
@@ -100,6 +97,7 @@ export class Orchestrator {
         const dataSourceKey = scope ? `${scope}.${stmt.dataSourceType}.${stmt.name}` : `${stmt.dataSourceType}.${stmt.name}`;
         this.dataSources.set(dataSourceKey, resolvedAttributes);
       }
+    }
   }
 
   /**
@@ -133,26 +131,19 @@ export class Orchestrator {
         const rawAttributes = stmt.attributes || [];
         const attributesMap: Record<string, any> = {};
 
-        if (Array.isArray(rawAttributes)) {
-          for (const a of rawAttributes) attributesMap[a.name] = a;
-        } else {
-          Object.assign(attributesMap, rawAttributes);
-        }
+        if (Array.isArray(rawAttributes)) for (const a of rawAttributes) attributesMap[a.name] = a;
+        else Object.assign(attributesMap, rawAttributes);
 
         const sourceAttr = attributesMap['source'];
         const sourceValue = sourceAttr ? sourceAttr.value : undefined;
 
-        if (typeof sourceValue !== 'string') {
-          throw new Error(`Module "${moduleName}" is missing a valid "source" attribute.`);
-        }
+        if (typeof sourceValue !== 'string') throw new Error(`Module "${moduleName}" is missing a valid "source" attribute.`);
 
         const sourcePath = sourceValue;
         const moduleDir = path.resolve(rootDir, sourcePath);
         const moduleFile = path.join(moduleDir, 'main.mf');
 
-        if (!fs.existsSync(moduleFile)) {
-          throw new Error(`Module source not found at: ${moduleFile}`);
-        }
+        if (!fs.existsSync(moduleFile)) throw new Error(`Module source not found at: ${moduleFile}`);
 
         const moduleContent = fs.readFileSync(moduleFile, 'utf-8');
         const lexer = new Lexer(moduleContent);
@@ -164,9 +155,7 @@ export class Orchestrator {
         const childScopeKey = this.getAddressScope(childAddress);
 
         // Pass inputs to child scope variables
-        if (!this.variables.has(childScopeKey)) {
-          this.variables.set(childScopeKey, new Map());
-        }
+        if (!this.variables.has(childScopeKey)) this.variables.set(childScopeKey, new Map());
         const childVars = this.variables.get(childScopeKey)!;
 
         // Process module attributes as inputs
@@ -213,12 +202,11 @@ export class Orchestrator {
     }));
 
     const schemas: Record<string, ISchema> = {};
-    for (const r of loadedResources) {
+    for (const r of loadedResources)
       if (!schemas[r.block.resourceType]) {
         const schema = await this.getSchema(r.block.resourceType);
         if (schema) schemas[r.block.resourceType] = schema;
       }
-    }
 
     return plan(virtualProgram, currentState, schemas);
   }
@@ -243,14 +231,12 @@ export class Orchestrator {
     }
 
     const graph = new Graph<null>();
-    for (const { uniqueId } of loadedResources) {
-      graph.addNode(uniqueId, null);
-    }
+    for (const { uniqueId } of loadedResources) graph.addNode(uniqueId, null);
 
     // Add output nodes to the graph
     for (const mod of loadedModules) {
       const scope = this.getAddressScope(mod.address);
-      for (const stmt of mod.program) {
+      for (const stmt of mod.program)
         if (stmt.type === 'Output') {
           const outputKey = scope ? `${scope}.outputs.${stmt.name}` : `outputs.${stmt.name}`;
           graph.addNode(outputKey, null);
@@ -258,13 +244,10 @@ export class Orchestrator {
           // Track dependencies for this output (any resource it refers to)
           this.addValueDependencies(stmt.value, graph, outputKey, mod.address);
         }
-      }
     }
 
     // Add edges for resource references
-    for (const { address, block } of loadedResources) {
-      this.addResourceDependencies(block, graph, address);
-    }
+    for (const { address, block } of loadedResources) this.addResourceDependencies(block, graph, address);
 
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
     await this.executePlan(createUpdateActions, graph, currentState, loadedModules);
@@ -276,9 +259,7 @@ export class Orchestrator {
     const varsObj: Record<string, Record<string, unknown>> = {};
     for (const [scope, varMap] of this.variables.entries()) {
       const simpleVarMap: Record<string, unknown> = {};
-      for (const [k, v] of varMap.entries()) {
-        simpleVarMap[k] = v.value;
-      }
+      for (const [k, v] of varMap.entries()) simpleVarMap[k] = v.value;
       varsObj[scope] = simpleVarMap;
     }
     currentState.variables = varsObj;
@@ -298,9 +279,7 @@ export class Orchestrator {
         outputs[stmt.name] = resolved;
 
         // Store in registry
-        if (!this.outputsRegistry.has(scope)) {
-          this.outputsRegistry.set(scope, new Map());
-        }
+        if (!this.outputsRegistry.has(scope)) this.outputsRegistry.set(scope, new Map());
         this.outputsRegistry.get(scope)!.set(stmt.name, resolved);
       }
     }
@@ -326,9 +305,7 @@ export class Orchestrator {
 
   private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>, parsedAddress: Address): void {
     const key = parsedAddress.toString();
-    for (const attr of Object.values(stmt.attributes)) {
-      this.addValueDependencies(attr, graph, key, parsedAddress);
-    }
+    for (const attr of Object.values(stmt.attributes)) this.addValueDependencies(attr, graph, key, parsedAddress);
   }
 
   private addValueDependencies(value: any, graph: Graph<null>, dependentKey: string, context: Address): void {
@@ -339,9 +316,7 @@ export class Orchestrator {
       if (refParts[0] === 'var') {
         const scope = this.getAddressScope(context);
         const variable = this.variables.get(scope)?.get(refParts[1]);
-        if (variable) {
-          this.addValueDependencies(variable.value, graph, dependentKey, variable.context);
-        }
+        if (variable) this.addValueDependencies(variable.value, graph, dependentKey, variable.context);
       } else if (refParts[0] === 'module') {
         const moduleName = refParts[1];
         const outputName = refParts[2];
@@ -374,9 +349,7 @@ export class Orchestrator {
             const parts = key.split('.outputs.');
             const scope = parts[0];
             const mod = loadedModules.find((m) => this.getAddressScope(m.address) === scope);
-            if (mod) {
-              this.processOutputs(mod.program, currentState, mod.address);
-            }
+            if (mod) this.processOutputs(mod.program, currentState, mod.address);
             return;
           }
 
@@ -448,7 +421,11 @@ export class Orchestrator {
     if (!currentResource) throw new Error(`Resource "${key}" not found in state for update`);
 
     const newAttributes = { ...currentResource.attributes };
-    for (const [k, change] of Object.entries(action.changes)) if (change.new !== undefined) newAttributes[k] = change.new;
+    for (const [k, change] of Object.entries(action.changes)) {
+      if (change.new !== undefined) {
+        newAttributes[k] = change.new;
+      }
+    }
 
     const inputs = this.convertAttributes(newAttributes, currentState, contextAddress);
 
@@ -491,9 +468,7 @@ export class Orchestrator {
     const scope = this.getAddressScope(context);
 
     const scopeVars = this.variables.get(scope);
-    if (!scopeVars || !scopeVars.has(varName)) {
-      throw new Error(`Variable "${varName}" is not defined in scope "${scope}"`);
-    }
+    if (!scopeVars || !scopeVars.has(varName)) throw new Error(`Variable "${varName}" is not defined in scope "${scope}"`);
 
     const variable = scopeVars.get(varName)!;
     return this.resolveValue(variable.value, state, variable.context);
@@ -509,9 +484,7 @@ export class Orchestrator {
     const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
 
     const scopeOutputs = this.outputsRegistry.get(childScope);
-    if (!scopeOutputs || !scopeOutputs.has(outputName)) {
-      throw new Error(`Output "${outputName}" not found in module "${childScope}"`);
-    }
+    if (!scopeOutputs || !scopeOutputs.has(outputName)) throw new Error(`Output "${outputName}" not found in module "${childScope}"`);
 
     return scopeOutputs.get(outputName);
   }
@@ -545,26 +518,17 @@ export class Orchestrator {
 
     try {
       let address: Address;
-      if (addressParts[0] === 'module') {
-        address = Address.parse(addressParts.join('.'));
-      } else {
-        address = new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
-      }
+      if (addressParts[0] === 'module') address = Address.parse(addressParts.join('.'));
+      else address = new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
 
       const resourceKey = address.toString();
       const resource = state.resources[resourceKey];
-      if (!resource) {
-        throw new Error(`Resource "${resourceKey}" not found in state`);
-      }
+      if (!resource) throw new Error(`Resource "${resourceKey}" not found in state`);
 
       let attrValue: any = resource.attributes[attributeName];
-      if (attrValue === undefined && attributeName === 'id') {
-        attrValue = resource.id;
-      }
+      if (attrValue === undefined && attributeName === 'id') attrValue = resource.id;
 
-      if (attrValue === undefined) {
-        throw new Error(`Attribute "${attributeName}" not found on resource "${resourceKey}"`);
-      }
+      if (attrValue === undefined) throw new Error(`Attribute "${attributeName}" not found on resource "${resourceKey}"`);
 
       if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
 

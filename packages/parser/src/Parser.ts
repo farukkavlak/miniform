@@ -161,13 +161,9 @@ export class Parser {
 
     const validReferenceTokens = [TokenType.Identifier, TokenType.Data, TokenType.Variable, TokenType.Resource, TokenType.Output, TokenType.Module];
 
-    while (this.matchToken(TokenType.Dot)) {
-      if (this.checkAny(...validReferenceTokens)) {
-        parts.push(this.advance().value);
-      } else {
-        return this.error('Expect property name after dot.');
-      }
-    }
+    while (this.matchToken(TokenType.Dot))
+      if (this.checkAny(...validReferenceTokens)) parts.push(this.advance().value);
+      else return this.error('Expect property name after dot.');
 
     return { type: 'Reference', value: parts };
   }
