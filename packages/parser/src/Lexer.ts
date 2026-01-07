@@ -17,6 +17,7 @@ export class Lexer {
     { type: TokenType.Variable, regex: /^variable\b/ },
     { type: TokenType.Data, regex: /^data\b/ },
     { type: TokenType.Output, regex: /^output\b/ },
+    { type: TokenType.Module, regex: /^module\b/ }, // Added module keyword
     { type: TokenType.Boolean, regex: /^(true|false)\b/ },
     { type: TokenType.Identifier, regex: /^[A-Z_a-z]\w*/ },
     { type: TokenType.String, regex: /^"[^"]*"/ },

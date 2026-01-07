@@ -1,4 +1,4 @@
-import { AttributeValue, DataBlock, OutputBlock, Program, ResourceBlock, Statement, VariableBlock } from './ast';
+import { AttributeValue, DataBlock, ModuleBlock, OutputBlock, Program, ResourceBlock, Statement, VariableBlock } from './ast';
 import { Token, TokenType } from './tokens';
 
 export class Parser {
@@ -20,6 +20,7 @@ export class Parser {
     [TokenType.Variable]: this.parseVariable.bind(this),
     [TokenType.Data]: this.parseData.bind(this),
     [TokenType.Output]: this.parseOutput.bind(this),
+    [TokenType.Module]: this.parseModule.bind(this),
   };
 
   private parseStatement(): Statement {
@@ -119,13 +120,36 @@ export class Parser {
     };
   }
 
+  private parseModule(): ModuleBlock {
+    // module "name" { ... }
+    const nameToken = this.consume(TokenType.String, "Expect module name string after 'module'.");
+
+    this.consume(TokenType.LBrace, "Expect '{' after module name.");
+
+    const attributes: Record<string, AttributeValue> = {};
+    while (!this.check(TokenType.RBrace) && !this.isAtEnd()) {
+      const key = this.consume(TokenType.Identifier, 'Expect attribute name.').value;
+      this.consume(TokenType.Assign, "Expect '=' after attribute name.");
+      const value = this.parseValue();
+      attributes[key] = value;
+    }
+
+    this.consume(TokenType.RBrace, "Expect '}' after block body.");
+
+    return {
+      type: 'Module',
+      name: nameToken.value,
+      attributes,
+    };
+  }
+
   private parseValue(): AttributeValue {
     if (this.matchToken(TokenType.String)) return { type: 'String', value: this.previous().value };
     if (this.matchToken(TokenType.Number)) return { type: 'Number', value: Number(this.previous().value) };
     if (this.matchToken(TokenType.Boolean)) return { type: 'Boolean', value: this.previous().value === 'true' };
 
     // Reference Parsing: identifier.key.subkey
-    if (this.check(TokenType.Identifier) || this.check(TokenType.Data)) return this.parseReference();
+    if (this.checkAny(TokenType.Identifier, TokenType.Data, TokenType.Module)) return this.parseReference();
 
     return this.error(`Unexpected value: ${this.peek().value}`);
   }
@@ -133,14 +157,17 @@ export class Parser {
   private parseReference(): AttributeValue {
     const parts: string[] = [];
 
-    // First part
     parts.push(this.advance().value);
 
-    // Subsequent parts (dot separated)
-    while (this.matchToken(TokenType.Dot))
-      if (this.check(TokenType.Identifier) || this.check(TokenType.Data) || this.check(TokenType.Variable) || this.check(TokenType.Resource) || this.check(TokenType.Output))
+    const validReferenceTokens = [TokenType.Identifier, TokenType.Data, TokenType.Variable, TokenType.Resource, TokenType.Output, TokenType.Module];
+
+    while (this.matchToken(TokenType.Dot)) {
+      if (this.checkAny(...validReferenceTokens)) {
         parts.push(this.advance().value);
-      else return this.error('Expect property name after dot.');
+      } else {
+        return this.error('Expect property name after dot.');
+      }
+    }
 
     return { type: 'Reference', value: parts };
   }
@@ -167,6 +194,10 @@ export class Parser {
   private check(type: TokenType): boolean {
     if (this.isAtEnd()) return false;
     return this.peek().type === type;
+  }
+
+  private checkAny(...types: TokenType[]): boolean {
+    return types.some((type) => this.check(type));
   }
 
   private advance(): Token {

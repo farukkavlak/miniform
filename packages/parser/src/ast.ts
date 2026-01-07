@@ -26,5 +26,11 @@ export interface DataBlock {
   attributes: Record<string, AttributeValue>;
 }
 
-export type Statement = ResourceBlock | VariableBlock | OutputBlock | DataBlock;
+export interface ModuleBlock {
+  type: 'Module';
+  name: string;
+  attributes: Record<string, AttributeValue>;
+}
+
+export type Statement = ResourceBlock | VariableBlock | OutputBlock | DataBlock | ModuleBlock;
 export type Program = Statement[];

@@ -98,6 +98,18 @@
 - [x] **State Locking:** Race condition protection (lock file).
 - [x] **State Backup:** Atomic writes with backup (.bak) generation.
 - [x] **Parser Error Reporting:** Detailed line/column error messages.
+- [ ] **Provider Architecture Refactor**
+  - [ ] Move from Singleton Provider to Instance-based Providers
+  - [ ] Support provider aliases (multi-region/account support)
+- [ ] **State Management Abstraction**
+  - [ ] Interface `IStateBackend` (Remote State support)
+  - [ ] Decouple `StateManager` from local `fs`
+- [ ] **Resource Addressing (Modules)**
+  - [ ] Implement hierarchical addressing (tree structure)
+  - [ ] Refactor resource map to support nested modules
+- [ ] **Type System Enhancement**
+  - [ ] Support List, Map, and Object types in Schema
+  - [ ] Improve planner diffing for complex types
 - [x] **Variables Support:** Support for usage of `var.name`.
 - [x] **Parallel Graph Execution:** Execute independent nodes in parallel.
 - [x] **String Interpolation:** `${var.x}` support (requires Lexer templates).
@@ -363,5 +375,3 @@
 - [ ] **Fuzz Testing**
   - [ ] Parser fuzz testing
         [ ] State corruption testing
-
-### 12.3. Documentation
