@@ -121,11 +121,10 @@
 - [x] **Output Blocks:** `output "name" { value = ... }` for displaying values after apply.
 - [ ] **Technical Debt (Phase 5: Modules)**
   - [ ] **Complexity:** `resolveResourceReference` complexity is high (13). Need to split into smaller methods.
-  - [ ] **Lint Warnings:** 119 warnings remaining across the workspace (CamelCase, braces, type safety).
-  - [ ] **Concurrency:** `require-atomic-updates` warning in Orchestrator.ts (apply method).
+  - [x] **Lint Warnings:** Reduced to ~50 (strictly `any` mocks and complexity).
+  - [x] **Concurrency:** Fixed `require-atomic-updates` via local caching.
   - [ ] **Type Safety:** Use actual types instead of `any` in test files.
   - [ ] **Provisioner Performance:** Resources are applied serially within layers; could be fully concurrent.
-
 
 ---
 
@@ -281,6 +280,7 @@
 ## 10. Medium Priority Features
 
 ### 10.1. Modules
+
 - [x] **Module Parsing**
   - [x] `module "name" { source = "..." }` syntax
   - [x] Module loading from filesystem
@@ -288,7 +288,6 @@
   - [x] Variable passing to modules
   - [x] Output from modules
   - [x] Nested modules
-
 
 ### 10.2. Lifecycle Management
 
