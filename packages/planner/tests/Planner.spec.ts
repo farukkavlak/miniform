@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { Program } from '@miniform/parser';
 import { IState } from '@miniform/state';
 import { describe, expect, it } from 'vitest';

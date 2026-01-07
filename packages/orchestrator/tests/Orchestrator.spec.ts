@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { IProvider, ISchema } from '@miniform/contracts';
 import { StateManager } from '@miniform/state';
 import fs from 'node:fs/promises';

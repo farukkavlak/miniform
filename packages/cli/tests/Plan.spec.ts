@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { Orchestrator } from '@miniform/orchestrator';
 import fs from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,7 +23,7 @@ vi.mock('@miniform/planner', async () => {
     serializePlan: vi.fn(() => ({
       version: '1.0',
       timestamp: 'mock-time',
-      config_hash: 'mock-hash',
+      configHash: 'mock-hash',
       actions: [],
     })),
   };

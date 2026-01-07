@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { Orchestrator } from '@miniform/orchestrator';
 import inquirer from 'inquirer';
 import fs from 'node:fs/promises';
@@ -193,7 +194,7 @@ describe('CLI: apply command', () => {
       const planFileContent = JSON.stringify({
         version: '1.0',
         timestamp: '2024-01-01T00:00:00Z',
-        config_hash: 'test-hash',
+        configHash: 'test-hash',
         actions: [{ type: 'CREATE', resourceType: 'test', name: 't' }],
       });
 
@@ -226,7 +227,7 @@ describe('CLI: apply command', () => {
       const planFileContent = JSON.stringify({
         version: '1.0',
         timestamp: '2024-01-01T00:00:00Z',
-        config_hash: 'test-hash',
+        configHash: 'test-hash',
         actions: [{ type: 'CREATE', resourceType: 'test', name: 't' }],
       });
 
@@ -259,7 +260,7 @@ describe('CLI: apply command', () => {
       const planFileContent = JSON.stringify({
         version: '1.0',
         timestamp: '2024-01-01T00:00:00Z',
-        config_hash: 'test-hash',
+        configHash: 'test-hash',
         actions: [{ type: 'CREATE', resourceType: 'test', name: 't' }],
       });
 

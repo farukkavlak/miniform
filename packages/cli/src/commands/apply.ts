@@ -83,7 +83,7 @@ async function executeApplyFromPlan(cwd: string, planFile: PlanFile, autoConfirm
   const configContent = await fs.readFile(configPath, 'utf8');
   const currentHash = crypto.createHash('sha256').update(configContent).digest('hex');
 
-  if (currentHash !== planFile.config_hash) {
+  if (currentHash !== planFile.configHash) {
     console.log(chalk.yellow('\nWarning: Configuration has changed since plan was created.'));
     console.log(chalk.yellow('The plan may be stale. Consider running `miniform plan` again.'));
   }

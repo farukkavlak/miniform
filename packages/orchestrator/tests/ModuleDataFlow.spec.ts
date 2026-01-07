@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 // Import plan to spy on it
 import { plan } from '@miniform/planner';
 import * as fs from 'node:fs';

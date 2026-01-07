@@ -18,7 +18,7 @@ export interface PlanAction {
 export interface PlanFile {
   version: string;
   timestamp: string;
-  config_hash: string;
+  configHash: string;
   actions: PlanAction[];
 }
 
@@ -28,7 +28,7 @@ export function serializePlan(actions: PlanAction[], configContent: string): Pla
   return {
     version: '1.0',
     timestamp: new Date().toISOString(),
-    config_hash: hash,
+    configHash: hash,
     actions,
   };
 }
@@ -37,7 +37,7 @@ export function validatePlanFile(planFile: unknown): planFile is PlanFile {
   if (!planFile || typeof planFile !== 'object') return false;
 
   const pf = planFile as Partial<PlanFile>;
-  return typeof pf.version === 'string' && typeof pf.timestamp === 'string' && typeof pf.config_hash === 'string' && Array.isArray(pf.actions);
+  return typeof pf.version === 'string' && typeof pf.timestamp === 'string' && typeof pf.configHash === 'string' && Array.isArray(pf.actions);
 }
 
 function calculateDiff(
