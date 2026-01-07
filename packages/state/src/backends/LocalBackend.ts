@@ -23,10 +23,10 @@ export class LocalBackend implements IStateBackend {
       return JSON.parse(content.toString('utf8')) as IState;
     } catch (error) {
       const err = error as { code?: string };
-      if (err.code === 'ENOENT') {
+      if (err.code === 'ENOENT')
         // Return empty state if file doesn't exist
         return { version: 1, variables: {}, resources: {} };
-      }
+
       throw error;
     }
   }
@@ -49,9 +49,8 @@ export class LocalBackend implements IStateBackend {
       // 'wx' flag fails if file exists
       await fs.writeFile(this.lockFilePath, String(Date.now()), { flag: 'wx' });
     } catch (error) {
-      if ((error as { code: string }).code === 'EEXIST') {
-        throw new Error('State is locked by another process.');
-      }
+      if ((error as { code: string }).code === 'EEXIST') throw new Error('State is locked by another process.');
+
       throw error;
     }
   }
@@ -60,9 +59,8 @@ export class LocalBackend implements IStateBackend {
     try {
       await fs.unlink(this.lockFilePath);
     } catch (error) {
-      if ((error as { code: string }).code !== 'ENOENT') {
-        throw error;
-      }
+      if ((error as { code: string }).code !== 'ENOENT') throw error;
+
       // If lock file doesn't exist, it's already unlocked (idempotent)
     }
   }

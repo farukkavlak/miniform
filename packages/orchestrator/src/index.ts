@@ -403,7 +403,7 @@ export class Orchestrator {
   }
 
   private interpolateString(value: string, state: IState, context?: Address): string {
-    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
+    return value.replaceAll(/\${([^}]+)}/g, (_: string, expr: string) => {
       const pathParts = expr.trim().split('.');
       const resolved = this.resolveReference(pathParts, state, context);
       return String(resolved ?? '');
