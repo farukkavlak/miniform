@@ -3,10 +3,8 @@ import { Lexer, Parser, Program } from '@miniform/parser';
 import { LocalProvider } from '@miniform/provider-local';
 import chalk from 'chalk';
 import { Command } from 'commander';
-// eslint-disable-next-line unicorn/import-style
 import * as fs from 'node:fs/promises';
-// eslint-disable-next-line unicorn/import-style
-import { resolve } from 'node:path';
+import path from 'node:path';
 
 async function validateSyntax(configContent: string): Promise<Program> {
   console.log(chalk.cyan('→ Checking syntax...'));
@@ -20,7 +18,7 @@ async function validateSyntax(configContent: string): Promise<Program> {
   } catch (error) {
     console.log(chalk.red('  ✗ Syntax error:'), error instanceof Error ? error.message : error);
     process.exit(1);
-    throw error; // Unreachable, but satisfies consistent-return
+    throw error;
   }
 }
 
@@ -40,11 +38,7 @@ async function validateSchemas(program: Program): Promise<void> {
       }
 
       const attrs: Record<string, unknown> = {};
-      if (stmt.attributes) {
-        for (const [key, value] of Object.entries(stmt.attributes)) {
-          attrs[key] = (value as { type: string; value: unknown }).value;
-        }
-      }
+      if (stmt.attributes) for (const [key, value] of Object.entries(stmt.attributes)) attrs[key] = (value as { type: string; value: unknown }).value;
 
       await provider.validate(stmt.resourceType, attrs);
       console.log(chalk.green(`  ✓ ${stmt.resourceType}.${stmt.name}`));
@@ -67,29 +61,19 @@ function checkStringDependencies(value: string, key: string, graph: Graph<null>)
     const refParts = expr.trim().split('.');
     if (refParts.length >= 2 && refParts[0] !== 'var' && refParts[0] !== 'data') {
       const depKey = `${refParts[0]}.${refParts[1]}`;
-      if (graph.hasNode(depKey)) {
-        graph.addEdge(depKey, key);
-      }
+      if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
     }
   }
 }
 
-attrName: string,
-  attrValue: { type: string; value: unknown },
-key: string,
-  graph: Graph<null>
-): void {
-  if(attrValue.type === 'Reference') {
-  const refParts = attrValue.value as string[];
-  if (refParts.length >= 2 && refParts[0] !== 'var' && refParts[0] !== 'data') {
-    const depKey = `${refParts[0]}.${refParts[1]}`;
-    if (graph.hasNode(depKey)) {
-      graph.addEdge(depKey, key);
+function checkAttributeDependencies(attrName: string, attrValue: { type: string; value: unknown }, key: string, graph: Graph<null>): void {
+  if (attrValue.type === 'Reference') {
+    const refParts = attrValue.value as string[];
+    if (refParts.length >= 2 && refParts[0] !== 'var' && refParts[0] !== 'data') {
+      const depKey = `${refParts[0]}.${refParts[1]}`;
+      if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
     }
-  }
-} else if (attrValue.type === 'String' && typeof attrValue.value === 'string') {
-  checkStringDependencies(attrValue.value, key, graph);
-}
+  } else if (attrValue.type === 'String' && typeof attrValue.value === 'string') checkStringDependencies(attrValue.value, key, graph);
 }
 
 function checkCircularDependencies(program: Program, graph: Graph<null>): void {
@@ -98,9 +82,7 @@ function checkCircularDependencies(program: Program, graph: Graph<null>): void {
 
     const key = `${stmt.resourceType}.${stmt.name}`;
 
-    for (const [name, attr] of Object.entries(stmt.attributes)) {
-      checkAttributeDependencies(name, attr as { type: string; value: unknown }, key, graph);
-    }
+    for (const [name, attr] of Object.entries(stmt.attributes)) checkAttributeDependencies(name, attr as { type: string; value: unknown }, key, graph);
   }
 }
 
@@ -109,12 +91,11 @@ function validateDependencies(program: Program): void {
   try {
     const graph = new Graph<null>();
 
-    for (const stmt of program) {
+    for (const stmt of program)
       if (stmt.type === 'Resource') {
         const key = `${stmt.resourceType}.${stmt.name}`;
         graph.addNode(key, null);
       }
-    }
 
     checkCircularDependencies(program, graph);
 
@@ -134,7 +115,7 @@ export function createValidateCommand(): Command {
     .argument('[config]', 'Path to config file', 'main.mf')
     .action(async (configPath: string) => {
       try {
-        const fullPath = resolve(process.cwd(), configPath);
+        const fullPath = path.resolve(process.cwd(), configPath);
         console.log(chalk.bold(`\nValidating ${configPath}...\n`));
 
         try {

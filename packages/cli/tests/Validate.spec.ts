@@ -150,8 +150,8 @@ resource "local_file" "b" {
     const command = createValidateCommand();
     try {
       await command.parseAsync(['node', 'test', '/tmp/nonexistent.mf']);
-    } catch (error: any) {
-      expect(error.message).toBe('ProcessExit');
+    } catch (error: unknown) {
+      expect((error as Error).message).toBe('ProcessExit');
     }
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('File not found'));
