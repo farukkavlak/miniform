@@ -31,6 +31,31 @@ describe('Planner', () => {
     expect(actions[0].attributes!.path).toEqual({ type: 'String', value: 'x' });
   });
 
+  it('should plan CREATE for nested module resources', () => {
+    const desired: Program = [
+      {
+        type: 'Resource',
+        resourceType: 'mock_resource',
+        name: 'nested_resource',
+        modulePath: ['app', 'db'],
+        attributes: { size: { type: 'String', value: 'large' } },
+      },
+    ];
+
+    const current: IState = {
+      version: 1,
+      resources: {},
+    };
+
+    const actions = plan(desired, current);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0].type).toBe('CREATE');
+    expect(actions[0].resourceType).toBe('mock_resource');
+    expect(actions[0].name).toBe('nested_resource');
+    expect(actions[0].modulePath).toEqual(['app', 'db']);
+  });
+
   it('should plan DELETE for removed resources', () => {
     const desired: Program = [];
     const current: IState = {
