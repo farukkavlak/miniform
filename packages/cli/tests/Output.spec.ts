@@ -2,7 +2,7 @@
 import { StateManager } from '@miniform/state';
 import * as fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createOutputCommand } from '../src/commands/output';
 
@@ -32,11 +32,11 @@ describe('Output Command', () => {
   const testStateDir = '/tmp/.miniform';
   const testStatePath = path.join(testStateDir, 'terraform.tfstate');
 
-  let readMock: ReturnType<typeof vi.fn>;
+  let readMock: Mock;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
     vi.clearAllMocks();

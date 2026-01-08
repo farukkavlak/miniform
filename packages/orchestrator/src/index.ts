@@ -210,7 +210,7 @@ export class Orchestrator {
         break;
       }
       default: {
-        throw new Error(`Unknown action type: ${(action as any).type}`); // eslint-disable-line @typescript-eslint/no-explicit-any
+        throw new Error(`Unknown action type: ${(action as { type: string }).type}`);
       }
     }
   }

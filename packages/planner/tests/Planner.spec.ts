@@ -3,7 +3,7 @@ import { Program } from '@miniform/parser';
 import { IState } from '@miniform/state';
 import { describe, expect, it } from 'vitest';
 
-import { plan, serializePlan, validatePlanFile } from '../src/index';
+import { plan, PlanAction, serializePlan, validatePlanFile } from '../src/index';
 
 describe('Planner', () => {
   it('should plan CREATE for new resources', () => {
@@ -182,8 +182,7 @@ describe('Planner', () => {
 
   describe('Plan Serialization', () => {
     it('should serialize plan correctly', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const actions: any[] = [];
+      const actions: PlanAction[] = [];
       const config = 'resource "test" {}';
       const serialized = serializePlan(actions, config);
 
