@@ -1,3 +1,4 @@
+import { Graph } from '@miniform/graph';
 import { LocalProvider } from '@miniform/provider-local';
 import * as fs from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,7 +22,9 @@ describe('Validate Command', () => {
 
   beforeEach(() => {
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('ProcessExit');
+    });
     vi.clearAllMocks();
 
     validateMock = vi.fn().mockResolvedValue(undefined);
@@ -75,7 +78,9 @@ resource "local_file" "test" {
     vi.mocked(fs.readFile).mockResolvedValue(invalidConfig);
 
     const command = createValidateCommand();
-    await command.parseAsync(['node', 'test', '/tmp/test.mf']);
+    try {
+      await command.parseAsync(['node', 'test', '/tmp/test.mf']);
+    } catch {}
 
     const allCalls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
     expect(allCalls).toContain('Syntax error');
@@ -97,7 +102,9 @@ resource "local_file" "test" {
     validateMock.mockRejectedValue(new Error('local_file requires "content" attribute'));
 
     const command = createValidateCommand();
-    await command.parseAsync(['node', 'test', '/tmp/test.mf']);
+    try {
+      await command.parseAsync(['node', 'test', '/tmp/test.mf']);
+    } catch {}
 
     const allCalls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
     expect(allCalls).toContain('Validating resource schemas');
@@ -123,20 +130,25 @@ resource "local_file" "b" {
     vi.mocked(fs.readFile).mockResolvedValue(circularConfig);
 
     const command = createValidateCommand();
-    await command.parseAsync(['node', 'test', '/tmp/test.mf']);
+    try {
+      await command.parseAsync(['node', 'test', '/tmp/test.mf']);
+    } catch {}
 
-    // Circular dependency should be detected by graph, but not cause validation to fail
+    // Circular dependency should be detected
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Checking dependencies'));
-    expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Dependency error'));
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Configuration is valid'));
-    expect(processExitSpy).not.toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Dependency error'), expect.anything());
+    expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 
   it('should handle missing file', async () => {
     vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
     const command = createValidateCommand();
-    await command.parseAsync(['node', 'test', '/tmp/nonexistent.mf']);
+    try {
+      await command.parseAsync(['node', 'test', '/tmp/nonexistent.mf']);
+    } catch (e: any) {
+      expect(e.message).toBe('ProcessExit');
+    }
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('File not found'));
     expect(processExitSpy).toHaveBeenCalledWith(1);
@@ -164,5 +176,36 @@ resource "local_file" "file2" {
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('local_file.file1'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('local_file.file2'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Configuration is valid'));
+  });
+
+  it('should handle dependency validation errors', async () => {
+    // Spy on Graph.prototype.topologicalSort to throw
+    const graphSpy = vi.spyOn(Graph.prototype, 'topologicalSort').mockImplementation(() => {
+      throw new Error('Graph error');
+    });
+
+    const validConfig = 'resource "local_file" "test" {}';
+    vi.mocked(fs.readFile).mockResolvedValue(validConfig);
+
+    const command = createValidateCommand();
+    try {
+      await command.parseAsync(['node', 'test', '/tmp/test.mf']);
+    } catch {}
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Dependency error'), expect.anything());
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('Graph error'));
+
+    graphSpy.mockRestore();
+  });
+
+  it('should validation process errors', async () => {
+    vi.mocked(fs.access).mockRejectedValue(new Error('Access error'));
+
+    const command = createValidateCommand();
+    try {
+      await command.parseAsync(['node', 'test', '/tmp/start_error.mf']);
+    } catch {}
+
+    expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 });

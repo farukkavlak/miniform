@@ -31,8 +31,27 @@ export class ReferenceResolver {
     if (!value || typeof value !== 'object') return value;
 
     const valueObj = value as { type?: string; value?: unknown };
-    if (valueObj.type === 'Reference' && Array.isArray(valueObj.value)) return this.resolve(valueObj.value as string[], state, context);
+
+    if (valueObj.type === 'Reference' && Array.isArray(valueObj.value)) {
+      return this.resolve(valueObj.value as string[], state, context);
+    }
+
+    if (valueObj.type === 'String' && typeof valueObj.value === 'string') {
+      return this.interpolateString(valueObj.value, state, context);
+    }
+
+    if ('type' in valueObj && 'value' in valueObj) {
+      return valueObj.value;
+    }
 
     return value;
+  }
+
+  interpolateString(value: string, state: IState, context?: Address): string {
+    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
+      const pathParts = expr.trim().split('.');
+      const resolved = this.resolve(pathParts, state, context);
+      return String(resolved ?? '');
+    });
   }
 }

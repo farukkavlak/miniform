@@ -109,6 +109,20 @@ export function createValidateCommand(): Command {
                         graph.addEdge(depKey, key);
                       }
                     }
+                  } else if (typedAttr.type === 'String' && typeof typedAttr.value === 'string') {
+                    // Check for interpolated references
+                    const matches = typedAttr.value.matchAll(/\${([^}]+)}/g);
+                    for (const match of matches) {
+                      const expr = match[1];
+                      const refParts = expr.trim().split('.');
+                      if (refParts.length >= 2 && refParts[0] !== 'var' && refParts[0] !== 'data') {
+                        const depKey = `${refParts[0]}.${refParts[1]}`;
+                        // We check hasNode to ensure we only link to Resources, not modules/etc for now
+                        if (graph.hasNode(depKey)) {
+                          graph.addEdge(depKey, key);
+                        }
+                      }
+                    }
                   }
                 }
               }

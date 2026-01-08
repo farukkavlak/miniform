@@ -3,7 +3,7 @@ import { Program } from '@miniform/parser';
 import { IState } from '@miniform/state';
 import { describe, expect, it } from 'vitest';
 
-import { plan } from '../src/index';
+import { ActionType, plan, serializePlan, validatePlanFile } from '../src/index';
 
 describe('Planner', () => {
   it('should plan CREATE for new resources', () => {
@@ -178,5 +178,35 @@ describe('Planner', () => {
     expect(actions[0].id).toBe('mock_id_123');
     expect(actions[1].type).toBe('CREATE');
     expect(actions[1].attributes).toEqual({ path: { type: 'String', value: 'new_path' } });
+  });
+
+  describe('Plan Serialization', () => {
+    it('should serialize plan correctly', () => {
+      const actions: any[] = [];
+      const config = 'resource "test" {}';
+      const serialized = serializePlan(actions, config);
+
+      expect(serialized.version).toBe('1.0');
+      expect(serialized.actions).toEqual(actions);
+      expect(serialized.configHash).toBeDefined();
+      expect(serialized.timestamp).toBeDefined();
+    });
+
+    it('should validate correct plan file', () => {
+      const planFile = {
+        version: '1.0',
+        timestamp: new Date().toISOString(),
+        configHash: 'hash',
+        actions: [],
+      };
+
+      expect(validatePlanFile(planFile)).toBe(true);
+    });
+
+    it('should reject invalid plan file', () => {
+      expect(validatePlanFile(null)).toBe(false);
+      expect(validatePlanFile({})).toBe(false);
+      expect(validatePlanFile({ version: 1 })).toBe(false); // wrong type
+    });
   });
 });
