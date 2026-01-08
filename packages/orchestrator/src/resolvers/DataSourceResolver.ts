@@ -1,5 +1,3 @@
-
-
 import { Address } from '../Address';
 import { ScopeManager } from '../scope/ScopeManager';
 import { IResolver } from './IResolver';
@@ -8,7 +6,7 @@ export class DataSourceResolver implements IResolver {
   constructor(
     private dataSources: Map<string, Record<string, unknown>>,
     private scopeManager: ScopeManager
-  ) { }
+  ) {}
 
   resolve(pathParts: string[], context: Address): unknown {
     if (pathParts.length < 4) throw new Error(`Data source reference must include attribute: ${pathParts.join('.')}`);

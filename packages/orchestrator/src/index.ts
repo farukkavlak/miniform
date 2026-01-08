@@ -1,5 +1,4 @@
 import { IProvider, ISchema } from '@miniform/contracts';
-
 import { AttributeValue, Lexer, Parser, Statement } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
@@ -10,8 +9,6 @@ import { DependencyGraphBuilder } from './components/DependencyGraphBuilder';
 import { LoadedModule, ModuleLoader } from './components/ModuleLoader';
 import { ReferenceResolver } from './resolvers/ReferenceResolver';
 import { ScopeManager } from './scope/ScopeManager';
-
-
 
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
@@ -213,7 +210,7 @@ export class Orchestrator {
         break;
       }
       default: {
-        throw new Error(`Unknown action type: ${(action as any).type}`);
+        throw new Error(`Unknown action type: ${(action as any).type}`); // eslint-disable-line @typescript-eslint/no-explicit-any
       }
     }
   }

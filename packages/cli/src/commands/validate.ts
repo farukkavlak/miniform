@@ -20,6 +20,7 @@ async function validateSyntax(configContent: string): Promise<Program> {
   } catch (error) {
     console.log(chalk.red('  ✗ Syntax error:'), error instanceof Error ? error.message : error);
     process.exit(1);
+    throw error; // Unreachable, but satisfies consistent-return
   }
 }
 
@@ -59,29 +60,36 @@ async function validateSchemas(program: Program): Promise<void> {
   }
 }
 
-function checkAttributeDependencies(
-  attrName: string,
-  attrValue: { type: string; value: unknown },
-  key: string,
-  graph: Graph<null>
-): void {
-  if (attrValue.type === 'Reference') {
-    const refParts = attrValue.value as string[];
+function checkStringDependencies(value: string, key: string, graph: Graph<null>): void {
+  const matches = value.matchAll(/\${([^}]+)}/g);
+  for (const match of matches) {
+    const expr = match[1];
+    const refParts = expr.trim().split('.');
     if (refParts.length >= 2 && refParts[0] !== 'var' && refParts[0] !== 'data') {
       const depKey = `${refParts[0]}.${refParts[1]}`;
-      if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
-    }
-  } else if (attrValue.type === 'String' && typeof attrValue.value === 'string') {
-    const matches = attrValue.value.matchAll(/\${([^}]+)}/g);
-    for (const match of matches) {
-      const expr = match[1];
-      const refParts = expr.trim().split('.');
-      if (refParts.length >= 2 && refParts[0] !== 'var' && refParts[0] !== 'data') {
-        const depKey = `${refParts[0]}.${refParts[1]}`;
-        if (graph.hasNode(depKey)) graph.addEdge(depKey, key);
+      if (graph.hasNode(depKey)) {
+        graph.addEdge(depKey, key);
       }
     }
   }
+}
+
+attrName: string,
+  attrValue: { type: string; value: unknown },
+key: string,
+  graph: Graph<null>
+): void {
+  if(attrValue.type === 'Reference') {
+  const refParts = attrValue.value as string[];
+  if (refParts.length >= 2 && refParts[0] !== 'var' && refParts[0] !== 'data') {
+    const depKey = `${refParts[0]}.${refParts[1]}`;
+    if (graph.hasNode(depKey)) {
+      graph.addEdge(depKey, key);
+    }
+  }
+} else if (attrValue.type === 'String' && typeof attrValue.value === 'string') {
+  checkStringDependencies(attrValue.value, key, graph);
+}
 }
 
 function checkCircularDependencies(program: Program, graph: Graph<null>): void {

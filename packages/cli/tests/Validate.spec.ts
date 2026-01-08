@@ -7,7 +7,6 @@ import { createValidateCommand } from '../src/commands/validate';
 
 vi.mock('node:fs/promises');
 vi.mock('@miniform/provider-local', () => {
-
   return {
     LocalProvider: vi.fn(),
   };
@@ -20,7 +19,7 @@ describe('Validate Command', () => {
   let getSchemaMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('ProcessExit');
     });
@@ -35,7 +34,7 @@ describe('Validate Command', () => {
         validate: validateMock,
         getSchema: getSchemaMock,
       } as unknown as LocalProvider;
-    } as any);
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
   });
 
   afterEach(() => {

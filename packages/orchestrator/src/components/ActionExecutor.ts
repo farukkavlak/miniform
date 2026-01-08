@@ -11,7 +11,7 @@ export class ActionExecutor {
     private providers: Map<string, IProvider>,
     private convertAttributes: (attributes: Record<string, unknown>, state: IState, context?: Address) => Record<string, unknown>,
     private resolveOutputByKey: (key: string, loadedModules: LoadedModule[], currentState: IState) => void
-  ) { }
+  ) {}
 
   async executeActionsSequentially(actions: PlanAction[], graph: Graph<null>, currentState: IState, loadedModules: LoadedModule[]): Promise<void> {
     const layers = graph.topologicalSort();

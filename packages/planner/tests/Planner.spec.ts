@@ -182,6 +182,7 @@ describe('Planner', () => {
 
   describe('Plan Serialization', () => {
     it('should serialize plan correctly', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const actions: any[] = [];
       const config = 'resource "test" {}';
       const serialized = serializePlan(actions, config);
