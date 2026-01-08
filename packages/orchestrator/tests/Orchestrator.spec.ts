@@ -388,4 +388,40 @@ describe('Orchestrator', () => {
       expect(inputs).toEqual({});
     });
   });
+
+  describe('Module Integration', () => {
+    it('should resolve module outputs during execution', async () => {
+      // Create module directory
+      const moduleDir = path.join(tmpDir, 'child_module');
+      await fs.mkdir(moduleDir, { recursive: true });
+
+      // Create module config with output
+      await fs.writeFile(
+        path.join(moduleDir, 'main.mf'),
+        `
+        output "child_val" {
+          value = "hello_module"
+        }
+      `
+      );
+
+      // Create root config using module and outputting its value
+      const rootConfig = `
+        module "child" {
+          source = "./child_module"
+        }
+
+        output "root_val" {
+          value = "\${module.child.child_val}"
+        }
+      `;
+
+      // Apply with tmpDir as root to locate module
+      const result = await orchestrator.apply(rootConfig, tmpDir);
+
+      // Verify root output contains module value
+      // This confirms that module output was resolved and passed to root
+      expect(result['root_val']).toBe('hello_module');
+    });
+  });
 });
