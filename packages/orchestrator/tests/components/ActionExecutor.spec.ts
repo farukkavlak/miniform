@@ -26,7 +26,19 @@ describe('ActionExecutor', () => {
     };
 
     providers = new Map([['test', mockProvider]]);
-    convertAttributes = vi.fn((attrs) => attrs);
+    convertAttributes = vi.fn((attrs) => {
+      const resolved: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(attrs)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (val && typeof val === 'object' && 'value' in (val as any)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          resolved[key] = (val as any).value;
+        } else {
+          resolved[key] = val;
+        }
+      }
+      return resolved;
+    });
     resolveOutputByKey = vi.fn();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
