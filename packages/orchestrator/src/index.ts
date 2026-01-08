@@ -1,5 +1,5 @@
 import { IProvider, ISchema } from '@miniform/contracts';
-import { Graph } from '@miniform/graph';
+
 import { AttributeValue, Lexer, Parser, Statement } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
@@ -7,14 +7,11 @@ import { IState, StateManager } from '@miniform/state';
 import { Address } from './Address';
 import { ActionExecutor } from './components/ActionExecutor';
 import { DependencyGraphBuilder } from './components/DependencyGraphBuilder';
-import { LoadedModule, LoadedResource, ModuleLoader } from './components/ModuleLoader';
+import { LoadedModule, ModuleLoader } from './components/ModuleLoader';
 import { ReferenceResolver } from './resolvers/ReferenceResolver';
 import { ScopeManager } from './scope/ScopeManager';
 
-interface VariableValue {
-  value: unknown;
-  context: Address; // Lexical scope where this value is defined
-}
+
 
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();

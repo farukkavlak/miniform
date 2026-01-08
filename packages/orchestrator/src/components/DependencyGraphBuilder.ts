@@ -1,12 +1,12 @@
 import { Graph } from '@miniform/graph';
-import { ResourceBlock, Statement } from '@miniform/parser';
+import { ResourceBlock } from '@miniform/parser';
 
 import { Address } from '../Address';
 import { ScopeManager } from '../scope/ScopeManager';
 import { LoadedModule, LoadedResource } from './ModuleLoader';
 
 export class DependencyGraphBuilder {
-  constructor(private scopeManager: ScopeManager) {}
+  constructor(private scopeManager: ScopeManager) { }
 
   buildExecutionGraph(loadedResources: LoadedResource[], loadedModules: LoadedModule[]): Graph<null> {
     const graph = new Graph<null>();

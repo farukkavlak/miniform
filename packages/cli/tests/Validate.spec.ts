@@ -7,8 +7,7 @@ import { createValidateCommand } from '../src/commands/validate';
 
 vi.mock('node:fs/promises');
 vi.mock('@miniform/provider-local', () => {
-  const validateFn = vi.fn();
-  const getSchemaFn = vi.fn();
+
   return {
     LocalProvider: vi.fn(),
   };
@@ -21,7 +20,7 @@ describe('Validate Command', () => {
   let getSchemaMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('ProcessExit');
     });
@@ -80,7 +79,9 @@ resource "local_file" "test" {
     const command = createValidateCommand();
     try {
       await command.parseAsync(['node', 'test', '/tmp/test.mf']);
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     const allCalls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
     expect(allCalls).toContain('Syntax error');
@@ -104,7 +105,9 @@ resource "local_file" "test" {
     const command = createValidateCommand();
     try {
       await command.parseAsync(['node', 'test', '/tmp/test.mf']);
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     const allCalls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
     expect(allCalls).toContain('Validating resource schemas');
@@ -132,7 +135,9 @@ resource "local_file" "b" {
     const command = createValidateCommand();
     try {
       await command.parseAsync(['node', 'test', '/tmp/test.mf']);
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     // Circular dependency should be detected
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Checking dependencies'));
@@ -146,8 +151,8 @@ resource "local_file" "b" {
     const command = createValidateCommand();
     try {
       await command.parseAsync(['node', 'test', '/tmp/nonexistent.mf']);
-    } catch (e: any) {
-      expect(e.message).toBe('ProcessExit');
+    } catch (error: any) {
+      expect(error.message).toBe('ProcessExit');
     }
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('File not found'));
@@ -190,7 +195,9 @@ resource "local_file" "file2" {
     const command = createValidateCommand();
     try {
       await command.parseAsync(['node', 'test', '/tmp/test.mf']);
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Dependency error'), expect.anything());
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('Graph error'));
@@ -204,7 +211,9 @@ resource "local_file" "file2" {
     const command = createValidateCommand();
     try {
       await command.parseAsync(['node', 'test', '/tmp/start_error.mf']);
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });

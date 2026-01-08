@@ -32,17 +32,17 @@ export class ReferenceResolver {
 
     const valueObj = value as { type?: string; value?: unknown };
 
-    if (valueObj.type === 'Reference' && Array.isArray(valueObj.value)) {
+    if (valueObj.type === 'Reference' && Array.isArray(valueObj.value)) 
       return this.resolve(valueObj.value as string[], state, context);
-    }
+    
 
-    if (valueObj.type === 'String' && typeof valueObj.value === 'string') {
+    if (valueObj.type === 'String' && typeof valueObj.value === 'string') 
       return this.interpolateString(valueObj.value, state, context);
-    }
+    
 
-    if ('type' in valueObj && 'value' in valueObj) {
+    if ('type' in valueObj && 'value' in valueObj) 
       return valueObj.value;
-    }
+    
 
     return value;
   }

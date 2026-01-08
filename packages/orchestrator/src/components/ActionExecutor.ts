@@ -11,7 +11,7 @@ export class ActionExecutor {
     private providers: Map<string, IProvider>,
     private convertAttributes: (attributes: Record<string, unknown>, state: IState, context?: Address) => Record<string, unknown>,
     private resolveOutputByKey: (key: string, loadedModules: LoadedModule[], currentState: IState) => void
-  ) {}
+  ) { }
 
   async executeActionsSequentially(actions: PlanAction[], graph: Graph<null>, currentState: IState, loadedModules: LoadedModule[]): Promise<void> {
     const layers = graph.topologicalSort();
@@ -66,6 +66,7 @@ export class ActionExecutor {
     const id = await provider.create(action.resourceType, inputs);
 
     const key = contextAddress.toString();
+    // eslint-disable-next-line require-atomic-updates
     currentState.resources[key] = {
       id,
       type: 'Resource',

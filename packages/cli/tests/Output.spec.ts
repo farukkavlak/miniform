@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { StateManager } from '@miniform/state';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -33,8 +34,8 @@ describe('Output Command', () => {
   let readMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
     vi.clearAllMocks();
@@ -189,7 +190,9 @@ describe('Output Command', () => {
     const command = createOutputCommand();
     try {
       await command.parseAsync(['node', 'test', '--state', testStatePath]);
-    } catch {}
+    } catch {
+      // ignore
+    }
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error reading outputs'), expect.anything());
     expect(processExitSpy).toHaveBeenCalledWith(1);

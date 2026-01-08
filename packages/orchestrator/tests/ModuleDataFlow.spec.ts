@@ -1,4 +1,4 @@
-/* eslint-disable camelcase */
+ 
 import { plan } from '@miniform/planner';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';

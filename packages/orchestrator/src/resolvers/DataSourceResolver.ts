@@ -1,4 +1,4 @@
-import { IState } from '@miniform/state';
+
 
 import { Address } from '../Address';
 import { ScopeManager } from '../scope/ScopeManager';
@@ -8,9 +8,9 @@ export class DataSourceResolver implements IResolver {
   constructor(
     private dataSources: Map<string, Record<string, unknown>>,
     private scopeManager: ScopeManager
-  ) {}
+  ) { }
 
-  resolve(pathParts: string[], context: Address, _state: IState): unknown {
+  resolve(pathParts: string[], context: Address): unknown {
     if (pathParts.length < 4) throw new Error(`Data source reference must include attribute: ${pathParts.join('.')}`);
 
     const [, dataSourceType, dataSourceName, attrName] = pathParts;

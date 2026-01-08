@@ -3,7 +3,7 @@ import { Program } from '@miniform/parser';
 import { IState } from '@miniform/state';
 import { describe, expect, it } from 'vitest';
 
-import { ActionType, plan, serializePlan, validatePlanFile } from '../src/index';
+import { plan, serializePlan, validatePlanFile } from '../src/index';
 
 describe('Planner', () => {
   it('should plan CREATE for new resources', () => {
