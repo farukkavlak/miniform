@@ -116,6 +116,21 @@ describe('Orchestrator - Data Sources', () => {
     await expect(orchestrator.apply(config)).rejects.toThrow('Data source mock_data with id missing-id not found');
   });
 
+  it('should throw error if data reference is incomplete', async () => {
+    // Reference without attribute: data.type.name
+    // Must use valid ID so data source loading succeeds
+    mockProvider.setMockData('valid-id', { val: 'ok' });
+    const config = `
+      data "mock_data" "test" {
+        id = "valid-id"
+      }
+      resource "mock_resource" "app" {
+        val = data.mock_data.test
+      }
+    `;
+    await expect(orchestrator.apply(config)).rejects.toThrow('Data source reference must include attribute');
+  });
+
   it('should support string interpolation with data sources', async () => {
     mockProvider.setMockData('config', {
       endpoint: 'api.example.com',
