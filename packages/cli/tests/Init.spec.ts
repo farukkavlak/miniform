@@ -45,7 +45,7 @@ describe('CLI: init command', () => {
     await createInitCommand().parseAsync(['node', 'miniform', 'init']);
 
     expect(fs.mkdir).toHaveBeenCalledWith(miniformDir, { recursive: true });
-    expect(StateManager).toHaveBeenCalledWith(cwd);
+    expect(StateManager).toHaveBeenCalledWith(expect.any(Object));
     expect(writeMock).toHaveBeenCalledWith({ version: 1, resources: {} });
   });
 

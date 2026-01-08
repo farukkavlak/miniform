@@ -221,8 +221,8 @@
   - [x] Store outputs in state
 - [x] **Output Display**
   - [x] Show outputs after apply
-  - [ ] `miniform output` command
-  - [ ] JSON output format
+  - [x] `miniform output` command
+  - [x] JSON output format
 
 ### 8.4. Better Error Messages
 
@@ -263,8 +263,8 @@
 ### 9.3. Validation
 
 - [x] **Config Validation**
-  - [ ] `miniform validate` command
-  - [ ] Syntax validation
+  - [x] `miniform validate` command
+  - [x] Syntax validation
   - [x] Provider schema validation
 - [x] **Dependency Validation**
   - [x] Detect circular dependencies

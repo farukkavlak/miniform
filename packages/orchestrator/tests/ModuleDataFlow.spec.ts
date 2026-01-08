@@ -259,5 +259,4 @@ resource "test_resource" "instance" {
     expect(dbResource).toBeDefined();
     expect(dbResource.attributes.name).toBe('production-db');
   });
-
 });
