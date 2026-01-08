@@ -52,7 +52,7 @@ describe('DependencyGraphBuilder', () => {
     graph.addNode('resource.db', null); // Add interpolation dependency node
 
     // val: "${resource.db.endpoint}"
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, no-template-curly-in-string
     (builder as any).addInterpolationDependencies('Server at ${resource.db.endpoint} is ready', graph, 'resource.main', context);
 
     // Expect edge: resource.db -> resource.main

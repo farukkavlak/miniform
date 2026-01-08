@@ -1,4 +1,3 @@
-
 import { IProvider, ISchema } from '@miniform/contracts';
 import { LocalBackend, StateManager } from '@miniform/state';
 import fs from 'node:fs/promises';
