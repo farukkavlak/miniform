@@ -5,6 +5,7 @@ import { createInitCommand } from './commands/init';
 import { createOutputCommand } from './commands/output';
 import { createPlanCommand } from './commands/plan';
 import { createValidateCommand } from './commands/validate';
+import { createStateCommand } from './commands/state';
 
 const program = new Command();
 
@@ -15,5 +16,6 @@ program.addCommand(createPlanCommand());
 program.addCommand(createApplyCommand());
 program.addCommand(createOutputCommand());
 program.addCommand(createValidateCommand());
+program.addCommand(createStateCommand());
 
 program.parse();
