@@ -1,5 +1,3 @@
-import { IState } from '@miniform/state';
-
 import { Address } from '../Address';
 import { ScopeManager } from '../scope/ScopeManager';
 import { IResolver } from './IResolver';
@@ -7,7 +5,7 @@ import { IResolver } from './IResolver';
 export class ModuleOutputResolver implements IResolver {
   constructor(private scopeManager: ScopeManager) {}
 
-  resolve(pathParts: string[], context: Address, _state: IState): unknown {
+  resolve(pathParts: string[], context: Address): unknown {
     if (pathParts.length < 3) throw new Error(`Module output reference must include output name: ${pathParts.join('.')}`);
 
     const [, moduleName, outputName] = pathParts;

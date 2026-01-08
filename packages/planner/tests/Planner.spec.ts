@@ -1,9 +1,8 @@
-/* eslint-disable camelcase */
 import { Program } from '@miniform/parser';
 import { IState } from '@miniform/state';
 import { describe, expect, it } from 'vitest';
 
-import { plan } from '../src/index';
+import { plan, PlanAction, serializePlan, validatePlanFile } from '../src/index';
 
 describe('Planner', () => {
   it('should plan CREATE for new resources', () => {
@@ -29,6 +28,31 @@ describe('Planner', () => {
     expect(actions[0].name).toBe('test_resource_a');
     expect(actions[0].attributes).toBeDefined();
     expect(actions[0].attributes!.path).toEqual({ type: 'String', value: 'x' });
+  });
+
+  it('should plan CREATE for nested module resources', () => {
+    const desired: Program = [
+      {
+        type: 'Resource',
+        resourceType: 'mock_resource',
+        name: 'nested_resource',
+        modulePath: ['app', 'db'],
+        attributes: { size: { type: 'String', value: 'large' } },
+      },
+    ];
+
+    const current: IState = {
+      version: 1,
+      resources: {},
+    };
+
+    const actions = plan(desired, current);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0].type).toBe('CREATE');
+    expect(actions[0].resourceType).toBe('mock_resource');
+    expect(actions[0].name).toBe('nested_resource');
+    expect(actions[0].modulePath).toEqual(['app', 'db']);
   });
 
   it('should plan DELETE for removed resources', () => {
@@ -178,5 +202,35 @@ describe('Planner', () => {
     expect(actions[0].id).toBe('mock_id_123');
     expect(actions[1].type).toBe('CREATE');
     expect(actions[1].attributes).toEqual({ path: { type: 'String', value: 'new_path' } });
+  });
+
+  describe('Plan Serialization', () => {
+    it('should serialize plan correctly', () => {
+      const actions: PlanAction[] = [];
+      const config = 'resource "test" {}';
+      const serialized = serializePlan(actions, config);
+
+      expect(serialized.version).toBe('1.0');
+      expect(serialized.actions).toEqual(actions);
+      expect(serialized.configHash).toBeDefined();
+      expect(serialized.timestamp).toBeDefined();
+    });
+
+    it('should validate correct plan file', () => {
+      const planFile = {
+        version: '1.0',
+        timestamp: new Date().toISOString(),
+        configHash: 'hash',
+        actions: [],
+      };
+
+      expect(validatePlanFile(planFile)).toBe(true);
+    });
+
+    it('should reject invalid plan file', () => {
+      expect(validatePlanFile(null)).toBe(false);
+      expect(validatePlanFile({})).toBe(false);
+      expect(validatePlanFile({ version: 1 })).toBe(false); // wrong type
+    });
   });
 });

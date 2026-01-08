@@ -1,5 +1,5 @@
 import { Graph } from '@miniform/graph';
-import { ResourceBlock, Statement } from '@miniform/parser';
+import { ResourceBlock } from '@miniform/parser';
 
 import { Address } from '../Address';
 import { ScopeManager } from '../scope/ScopeManager';
@@ -80,7 +80,6 @@ export class DependencyGraphBuilder {
   }
 
   private parseResourceAddress(addressParts: string[], context?: Address): Address {
-    if (addressParts[0] === 'module') return Address.parse(addressParts.join('.'));
     return new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
   }
 }

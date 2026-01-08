@@ -1,7 +1,7 @@
 import { StateManager } from '@miniform/state';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 
 import { createOutputCommand } from '../src/commands/output';
 
@@ -25,14 +25,17 @@ vi.mock('node:fs', () => ({
 
 describe('Output Command', () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let processExitSpy: ReturnType<typeof vi.spyOn>;
 
   const testStateDir = '/tmp/.miniform';
   const testStatePath = path.join(testStateDir, 'terraform.tfstate');
-  let readMock: ReturnType<typeof vi.fn>;
+
+  let readMock: Mock;
 
   beforeEach(() => {
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
     vi.clearAllMocks();
@@ -152,5 +155,46 @@ describe('Output Command', () => {
     const allCalls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
     expect(allCalls).toContain('root_output');
     expect(allCalls).not.toContain('module_output');
+  });
+
+  it('should extract values from complex objects', async () => {
+    const mockState = {
+      resources: {},
+      variables: {
+        '': {
+          obj_out: {
+            value: { nested: 'value' }, // Miniform variable structure
+          },
+          raw_out: {
+            simple: 'object', // Raw object without value wrapper
+          },
+        },
+      },
+    };
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    readMock.mockResolvedValue(mockState);
+
+    const command = createOutputCommand();
+    await command.parseAsync(['node', 'test', '--state', testStatePath]);
+
+    const allCalls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
+    expect(allCalls).toContain('nested');
+    expect(allCalls).toContain('simple');
+  });
+
+  it('should handle state reading errors', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    readMock.mockRejectedValue(new Error('Corrupt state'));
+
+    const command = createOutputCommand();
+    try {
+      await command.parseAsync(['node', 'test', '--state', testStatePath]);
+    } catch {
+      // ignore
+    }
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error reading outputs'), expect.anything());
+    expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 });

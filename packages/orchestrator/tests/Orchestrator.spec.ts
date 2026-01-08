@@ -12,12 +12,10 @@ class MockProvider implements IProvider {
   readonly resources = ['mock_resource'];
   private createdResources: Map<string, Record<string, unknown>> = new Map();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getSchema(_type: string): Promise<ISchema> {
     return {};
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing
   }
@@ -38,7 +36,6 @@ class MockProvider implements IProvider {
     this.createdResources.delete(id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async read(_type: string, _inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
     return {};
   }
@@ -389,6 +386,42 @@ describe('Orchestrator', () => {
 
       const [, inputs] = Array.from(created.entries())[0];
       expect(inputs).toEqual({});
+    });
+  });
+
+  describe('Module Integration', () => {
+    it('should resolve module outputs during execution', async () => {
+      // Create module directory
+      const moduleDir = path.join(tmpDir, 'child_module');
+      await fs.mkdir(moduleDir, { recursive: true });
+
+      // Create module config with output
+      await fs.writeFile(
+        path.join(moduleDir, 'main.mf'),
+        `
+        output "child_val" {
+          value = "hello_module"
+        }
+      `
+      );
+
+      // Create root config using module and outputting its value
+      const rootConfig = `
+        module "child" {
+          source = "./child_module"
+        }
+
+        output "root_val" {
+          value = "\${module.child.child_val}"
+        }
+      `;
+
+      // Apply with tmpDir as root to locate module
+      const result = await orchestrator.apply(rootConfig, tmpDir);
+
+      // Verify root output contains module value
+      // This confirms that module output was resolved and passed to root
+      expect(result['root_val']).toBe('hello_module');
     });
   });
 });

@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import { Orchestrator } from '@miniform/orchestrator';
 import inquirer from 'inquirer';
 import fs from 'node:fs/promises';

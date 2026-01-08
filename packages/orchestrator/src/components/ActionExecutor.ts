@@ -66,6 +66,7 @@ export class ActionExecutor {
     const id = await provider.create(action.resourceType, inputs);
 
     const key = contextAddress.toString();
+    // eslint-disable-next-line require-atomic-updates
     currentState.resources[key] = {
       id,
       type: 'Resource',

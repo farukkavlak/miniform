@@ -43,7 +43,6 @@ export class LocalFileResource implements IResourceHandler {
     await fs.unlink(id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async read(_inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
     return {};
   }

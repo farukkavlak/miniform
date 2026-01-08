@@ -1,5 +1,4 @@
 import { IProvider, ISchema } from '@miniform/contracts';
-import { Graph } from '@miniform/graph';
 import { AttributeValue, Lexer, Parser, Statement } from '@miniform/parser';
 import { plan, PlanAction } from '@miniform/planner';
 import { IState, StateManager } from '@miniform/state';
@@ -7,14 +6,9 @@ import { IState, StateManager } from '@miniform/state';
 import { Address } from './Address';
 import { ActionExecutor } from './components/ActionExecutor';
 import { DependencyGraphBuilder } from './components/DependencyGraphBuilder';
-import { LoadedModule, LoadedResource, ModuleLoader } from './components/ModuleLoader';
+import { LoadedModule, ModuleLoader } from './components/ModuleLoader';
 import { ReferenceResolver } from './resolvers/ReferenceResolver';
 import { ScopeManager } from './scope/ScopeManager';
-
-interface VariableValue {
-  value: unknown;
-  context: Address; // Lexical scope where this value is defined
-}
 
 export class Orchestrator {
   private providers: Map<string, IProvider> = new Map();
@@ -145,7 +139,11 @@ export class Orchestrator {
     await this.actionExecutor.executeActionsSequentially(createUpdateActions, graph, currentState, loadedModules);
 
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
-    for (const action of deleteActions) await this.executeAction(action, currentState);
+    for (const action of deleteActions) {
+      const provider = this.providers.get(action.resourceType);
+      if (!provider) throw new Error(`No provider registered for resource type "${action.resourceType}"`);
+      await this.actionExecutor.executeDelete(action, provider, currentState);
+    }
 
     this.syncStateVariables(currentState);
 
@@ -168,14 +166,8 @@ export class Orchestrator {
     return outputs;
   }
 
-  private resolveValue(value: { type: string; value: unknown } | unknown, state: IState, context?: Address): unknown {
-    if (value && typeof value === 'object' && 'type' in value) {
-      const typedVal = value as { type: string; value: unknown };
-      if (typedVal.type === 'Reference') return this.resolveReference(typedVal.value as string[], state, context);
-      if (typedVal.type === 'String') return this.interpolateString(typedVal.value as string, state, context);
-      return typedVal.value;
-    }
-    return value;
+  private resolveValue(value: unknown, state: IState, context?: Address): unknown {
+    return this.referenceResolver.resolveValue(value, state, context);
   }
 
   private convertAttributes(attributes: Record<string, unknown>, state: IState, context?: Address): Record<string, unknown> {
@@ -199,125 +191,6 @@ export class Orchestrator {
       varsObj[scope] = simpleVarMap;
     }
     currentState.variables = varsObj;
-  }
-
-  private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
-    const provider = this.providers.get(action.resourceType);
-    if (!provider) throw new Error(`No provider registered for resource type "${action.resourceType}"`);
-
-    switch (action.type) {
-      case 'CREATE': {
-        await this.actionExecutor.executeCreate(action, provider, currentState);
-        break;
-      }
-      case 'UPDATE': {
-        await this.actionExecutor.executeUpdate(action, provider, currentState);
-        break;
-      }
-      case 'DELETE': {
-        await this.actionExecutor.executeDelete(action, provider, currentState);
-        break;
-      }
-      case 'NO_OP': {
-        break;
-      }
-      default: {
-        throw new Error(`Unknown action type: ${(action as any).type}`);
-      }
-    }
-  }
-
-  private interpolateString(value: string, state: IState, context?: Address): string {
-    return value.replace(/\${([^}]+)}/g, (_: string, expr: string) => {
-      const pathParts = expr.trim().split('.');
-      const resolved = this.resolveReference(pathParts, state, context);
-      return String(resolved ?? '');
-    });
-  }
-
-  private resolveReference(pathParts: string[], state: IState, context?: Address): unknown {
-    if (pathParts.length < 2) throw new Error(`Invalid reference path: ${pathParts.join('.')}`);
-
-    if (pathParts[0] === 'var') return this.resolveVariableReference(pathParts, state, context);
-    if (pathParts[0] === 'data') return this.resolveDataSourceReference(pathParts, context);
-    if (pathParts[0] === 'module') return this.resolveModuleOutputReference(pathParts, state, context);
-    return this.resolveResourceReference(pathParts, state, context);
-  }
-
-  private resolveVariableReference(pathParts: string[], state: IState, context?: Address): unknown {
-    const varName = pathParts[1];
-    const scope = this.scopeManager.getScope(context);
-
-    const variable = this.scopeManager.getVariable(scope, varName);
-    if (!variable) throw new Error(`Variable "${varName}" is not defined in scope "${scope}"`);
-
-    return this.resolveValue(variable.value, state, variable.context);
-  }
-
-  private resolveModuleOutputReference(pathParts: string[], state: IState, context?: Address): unknown {
-    if (pathParts.length < 3) throw new Error(`Module output reference must include output name: ${pathParts.join('.')}`);
-
-    const moduleName = pathParts[1];
-    const outputName = pathParts[2];
-
-    const currentScope = this.scopeManager.getScope(context);
-    const childScope = currentScope ? `${currentScope}.module.${moduleName}` : `module.${moduleName}`;
-    const output = this.scopeManager.getOutput(childScope, outputName);
-
-    if (output === undefined) throw new Error(`Output "${outputName}" not found in module "${childScope}"`);
-
-    return output;
-  }
-
-  private resolveDataSourceReference(pathParts: string[], context?: Address): unknown {
-    if (pathParts.length < 4) throw new Error(`Data source reference must include attribute: ${pathParts.join('.')}`);
-
-    const dataSourceType = pathParts[1];
-    const dataSourceName = pathParts[2];
-    const attrName = pathParts[3];
-
-    const scope = this.scopeManager.getScope(context);
-    const dataSourceKey = scope ? `${scope}.${dataSourceType}.${dataSourceName}` : `${dataSourceType}.${dataSourceName}`;
-
-    const dataAttributes = this.dataSources.get(dataSourceKey);
-
-    if (!dataAttributes) throw new Error(`Data source "${dataSourceKey}" not found (or not resolved yet)`);
-
-    const attrValue = dataAttributes[attrName];
-
-    if (attrValue === undefined) throw new Error(`Attribute "${attrName}" not found on data source "${dataSourceKey}"`);
-
-    return attrValue;
-  }
-
-  private resolveResourceReference(pathParts: string[], state: IState, context?: Address): unknown {
-    if (pathParts.length < 3) throw new Error(`Resource reference must include attribute: ${pathParts.join('.')}`);
-
-    const address = this.parseResourceAddress(pathParts.slice(0, -1), context);
-    const resourceKey = address.toString();
-    const resource = state.resources[resourceKey];
-
-    if (!resource) throw new Error(`Invalid resource reference "${pathParts.join('.')}": Resource "${resourceKey}" not found in state`);
-
-    const attributeName = pathParts.at(-1)!;
-    return this.getResolvedAttribute(resource, attributeName, pathParts.join('.'));
-  }
-
-  private parseResourceAddress(addressParts: string[], context?: Address): Address {
-    if (addressParts[0] === 'module') return Address.parse(addressParts.join('.'));
-    return new Address(context ? context.modulePath : [], addressParts[0], addressParts[1]);
-  }
-
-  private getResolvedAttribute(resource: { id?: string; attributes: Record<string, unknown> }, attributeName: string, fullPath: string): unknown {
-    let attrValue: unknown = resource.attributes[attributeName];
-    if (attrValue === undefined && attributeName === 'id') attrValue = resource.id;
-
-    if (attrValue === undefined) throw new Error(`Invalid resource reference "${fullPath}": Attribute "${attributeName}" not found on resource`);
-
-    // Handle reference objects stored in state (if any)
-    if (attrValue && typeof attrValue === 'object' && 'type' in attrValue && 'value' in attrValue) return (attrValue as { value: unknown }).value;
-
-    return attrValue;
   }
 
   private getAttributesMap(attributes: Record<string, AttributeValue> | undefined): Record<string, unknown> {

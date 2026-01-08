@@ -12,25 +12,20 @@ class MockDataProvider implements IProvider {
   readonly resources = ['mock_resource', 'mock_data', 'unknown_provider'];
   data = new Map<string, Record<string, unknown>>();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getSchema(_type: string): Promise<ISchema> {
     return {};
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async create(_type: string, _inputs: Record<string, unknown>): Promise<string> {
     return 'created-id';
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async update(_id: string, _type: string, _inputs: Record<string, unknown>): Promise<void> {}
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async delete(_id: string): Promise<void> {}
 
   // Implement read for data sources
@@ -119,6 +114,21 @@ describe('Orchestrator - Data Sources', () => {
     `;
 
     await expect(orchestrator.apply(config)).rejects.toThrow('Data source mock_data with id missing-id not found');
+  });
+
+  it('should throw error if data reference is incomplete', async () => {
+    // Reference without attribute: data.type.name
+    // Must use valid ID so data source loading succeeds
+    mockProvider.setMockData('valid-id', { val: 'ok' });
+    const config = `
+      data "mock_data" "test" {
+        id = "valid-id"
+      }
+      resource "mock_resource" "app" {
+        val = data.mock_data.test
+      }
+    `;
+    await expect(orchestrator.apply(config)).rejects.toThrow('Data source reference must include attribute');
   });
 
   it('should support string interpolation with data sources', async () => {

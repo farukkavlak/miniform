@@ -36,19 +36,16 @@ export class RandomStringResource implements IResourceHandler {
     return result;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async update(id: string, inputs: Record<string, unknown>): Promise<void> {
+  async update(_id: string, _inputs: Record<string, unknown>): Promise<void> {
     // RandomString is immutable. If inputs change (e.g., length), logic dictates
     // the resource should be recreated (Destroy -> Create) by the Orchestrator.
     // We cannot update the ID (which represents the value) in-place here.
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async delete(_id: string): Promise<void> {
     // No-op
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async read(_inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
     return {};
   }

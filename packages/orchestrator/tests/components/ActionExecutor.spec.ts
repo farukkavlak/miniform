@@ -1,0 +1,242 @@
+import { IProvider } from '@miniform/contracts';
+import { Graph } from '@miniform/graph';
+import { PlanAction } from '@miniform/planner';
+import { IState } from '@miniform/state';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
+
+import { Address } from '../../src/Address';
+import { ActionExecutor } from '../../src/components/ActionExecutor';
+
+describe('ActionExecutor', () => {
+  let providers: Map<string, IProvider>;
+  let convertAttributes: Mock;
+  let resolveOutputByKey: Mock;
+  let executor: ActionExecutor;
+  let mockProvider: IProvider;
+
+  beforeEach(() => {
+    mockProvider = {
+      resources: ['test'],
+      validate: vi.fn(),
+      create: vi.fn().mockResolvedValue('created-id'),
+      update: vi.fn(),
+      delete: vi.fn(),
+      read: vi.fn(),
+      getSchema: vi.fn(),
+    };
+
+    providers = new Map([['test', mockProvider]]);
+    convertAttributes = vi.fn((attrs) => {
+      const resolved: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(attrs)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (val && typeof val === 'object' && 'value' in (val as any)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          resolved[key] = (val as any).value;
+        } else {
+          resolved[key] = val;
+        }
+      }
+      return resolved;
+    });
+    resolveOutputByKey = vi.fn();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    executor = new ActionExecutor(providers, convertAttributes as any, resolveOutputByKey as any);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const mockState: IState = {
+    version: 1,
+    resources: {},
+  };
+
+  const context = new Address([], 'test', 'main');
+
+  describe('executeAction', () => {
+    it('should throw if provider not found', async () => {
+      const action: PlanAction = {
+        type: 'CREATE',
+        resourceType: 'unknown',
+        name: 'main',
+        attributes: {},
+      };
+
+      const actionAddress = new Address([], 'unknown', 'main');
+      const graph = new Graph<null>();
+      graph.addNode(actionAddress.toString(), null);
+
+      await expect(executor.executeActionsSequentially([action], graph, mockState, [])).rejects.toThrow('No provider registered');
+    });
+
+    it('should throw on unknown action type', async () => {
+      const action: PlanAction = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type: 'UNKNOWN' as any,
+        resourceType: 'test',
+        name: 'main',
+        attributes: {},
+      };
+
+      const actionAddress = new Address([], 'test', 'main');
+      const graph = new Graph<null>();
+      graph.addNode(actionAddress.toString(), null);
+
+      await expect(executor.executeActionsSequentially([action], graph, mockState, [])).rejects.toThrow('Unknown action type');
+    });
+
+    it('should ignore NO_OP actions', async () => {
+      const action: PlanAction = {
+        type: 'NO_OP',
+        resourceType: 'test',
+        name: 'main',
+      };
+
+      const actionAddress = new Address([], 'test', 'main');
+      const graph = new Graph<null>();
+      graph.addNode(actionAddress.toString(), null);
+
+      await executor.executeActionsSequentially([action], graph, mockState, []);
+      expect(mockProvider.create).not.toHaveBeenCalled();
+      expect(mockProvider.update).not.toHaveBeenCalled();
+      expect(mockProvider.delete).not.toHaveBeenCalled();
+    });
+
+    it('should execute DELETE action via sequential execution', async () => {
+      const action: PlanAction = {
+        type: 'DELETE',
+        resourceType: 'test',
+        name: 'main',
+        id: 'existing-id',
+      };
+
+      const actionAddress = new Address([], 'test', 'main');
+      const graph = new Graph<null>();
+      graph.addNode(actionAddress.toString(), null);
+
+      await executor.executeActionsSequentially([action], graph, mockState, []);
+      expect(mockProvider.delete).toHaveBeenCalledWith('existing-id', 'test');
+    });
+  });
+
+  describe('executeCreate', () => {
+    it('should throw if CREATE action missing attributes', async () => {
+      const action: PlanAction = {
+        type: 'CREATE',
+        resourceType: 'test',
+        name: 'main',
+      };
+
+      await expect(executor.executeCreate(action, mockProvider, mockState)).rejects.toThrow('missing attributes');
+    });
+  });
+
+  describe('executeUpdate', () => {
+    it('should throw if UPDATE action missing changes', async () => {
+      const action: PlanAction = {
+        type: 'UPDATE',
+        resourceType: 'test',
+        name: 'main',
+        id: 'id',
+      };
+
+      await expect(executor.executeUpdate(action, mockProvider, mockState)).rejects.toThrow('missing changes');
+    });
+
+    it('should throw if resource not found in state', async () => {
+      const action: PlanAction = {
+        type: 'UPDATE',
+        resourceType: 'test',
+        name: 'missing',
+        id: 'id',
+        changes: {},
+      };
+
+      // Ensure state is empty
+      mockState.resources = {};
+
+      await expect(executor.executeUpdate(action, mockProvider, mockState)).rejects.toThrow('not found in state');
+    });
+
+    it('should throw if UPDATE action missing resource ID', async () => {
+      const key = context.toString();
+      mockState.resources[key] = {
+        id: 'existing',
+        type: 'Resource',
+        resourceType: 'test',
+        name: 'main',
+        attributes: {},
+      };
+
+      const action: PlanAction = {
+        type: 'UPDATE',
+        resourceType: 'test',
+        name: 'main',
+        changes: {},
+        // missing id
+      };
+
+      await expect(executor.executeUpdate(action, mockProvider, mockState)).rejects.toThrow('missing resource ID');
+    });
+
+    it('should update specific attributes based on changes', async () => {
+      const key = context.toString();
+      // Setup initial state
+      mockState.resources[key] = {
+        id: 'existing',
+        type: 'Resource',
+        resourceType: 'test',
+        name: 'main',
+        attributes: { old: 'val', kept: 'val' },
+      };
+
+      const action: PlanAction = {
+        type: 'UPDATE',
+        resourceType: 'test',
+        name: 'main',
+        id: 'existing',
+        changes: {
+          old: { old: { type: 'String', value: 'val' }, new: { type: 'String', value: 'updated' } },
+          kept: { old: { type: 'String', value: 'val' }, new: undefined },
+        },
+      };
+
+      await executor.executeUpdate(action, mockProvider, mockState);
+
+      expect(mockProvider.update).toHaveBeenCalledWith(
+        'existing',
+        'test',
+        expect.objectContaining({
+          old: 'updated',
+          kept: 'val',
+        })
+      );
+    });
+  });
+
+  describe('executeDelete', () => {
+    it('should throw if DELETE action missing id', async () => {
+      const action: PlanAction = {
+        type: 'DELETE',
+        resourceType: 'test',
+        name: 'main',
+      };
+
+      await expect(executor.executeDelete(action, mockProvider, mockState)).rejects.toThrow('missing id');
+    });
+  });
+
+  describe('Graph Execution', () => {
+    it('should resolve outputs if key indicates output', async () => {
+      const graph = new Graph<null>();
+      graph.addNode('module.app.outputs.ip', null);
+
+      await executor.executeActionsSequentially([], graph, mockState, []);
+
+      expect(resolveOutputByKey).toHaveBeenCalledWith('module.app.outputs.ip', [], mockState);
+    });
+  });
+});
