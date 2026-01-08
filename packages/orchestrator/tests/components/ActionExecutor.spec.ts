@@ -87,6 +87,39 @@ describe('ActionExecutor', () => {
 
       await expect(executor.executeActionsSequentially([action], graph, mockState, [])).rejects.toThrow('Unknown action type');
     });
+
+    it('should ignore NO_OP actions', async () => {
+      const action: PlanAction = {
+        type: 'NO_OP',
+        resourceType: 'test',
+        name: 'main',
+      };
+
+      const actionAddress = new Address([], 'test', 'main');
+      const graph = new Graph<null>();
+      graph.addNode(actionAddress.toString(), null);
+
+      await executor.executeActionsSequentially([action], graph, mockState, []);
+      expect(mockProvider.create).not.toHaveBeenCalled();
+      expect(mockProvider.update).not.toHaveBeenCalled();
+      expect(mockProvider.delete).not.toHaveBeenCalled();
+    });
+
+    it('should execute DELETE action via sequential execution', async () => {
+      const action: PlanAction = {
+        type: 'DELETE',
+        resourceType: 'test',
+        name: 'main',
+        id: 'existing-id',
+      };
+
+      const actionAddress = new Address([], 'test', 'main');
+      const graph = new Graph<null>();
+      graph.addNode(actionAddress.toString(), null);
+
+      await executor.executeActionsSequentially([action], graph, mockState, []);
+      expect(mockProvider.delete).toHaveBeenCalledWith('existing-id', 'test');
+    });
   });
 
   describe('executeCreate', () => {

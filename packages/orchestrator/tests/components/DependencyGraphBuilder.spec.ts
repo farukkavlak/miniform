@@ -60,4 +60,62 @@ describe('DependencyGraphBuilder', () => {
     const adj = (graph as any).adjacencyList;
     expect(adj.get('resource.db').has('resource.main')).toBe(true);
   });
+
+  it('should handle Interpolation object in addValueDependencies', () => {
+    const graph = new Graph<null>();
+    graph.addNode('resource.main', null);
+    graph.addNode('resource.kv', null);
+
+    const interpolationVal = {
+      type: 'Interpolation',
+      value: '${resource.kv.id}',
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (builder as any).addValueDependencies(interpolationVal, graph, 'resource.main', context);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adj = (graph as any).adjacencyList;
+    expect(adj.get('resource.kv').has('resource.main')).toBe(true);
+  });
+
+  it('should build graph with module outputs', () => {
+    const mockModules = [
+      {
+        address: new Address(['app'], '', ''),
+        program: [
+          {
+            type: 'Output',
+            name: 'ip',
+            value: { type: 'Reference', value: ['resource', 'instance', 'ip'] },
+          },
+        ],
+      },
+    ];
+
+    const mockResources = [
+      {
+        uniqueId: 'module.app.resource.instance',
+        address: new Address(['app'], 'resource', 'instance'),
+        block: { type: 'Resource', resourceType: 'instance', name: 'ip', attributes: {} },
+      },
+    ];
+
+    // Need scope manager to return scope string
+    scopeManager.getScope = (addr) => 'module.app';
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const graph = builder.buildExecutionGraph(mockResources as any, mockModules as any);
+
+    // Check Output Node existence
+    expect(graph.hasNode('module.app.outputs.ip')).toBe(true);
+    // Check Dependency Node existence
+    expect(graph.hasNode('module.app.resource.instance')).toBe(true);
+
+    // Verify edge: module.app.resource.instance -> module.app.outputs.ip
+    // Note: Value dependency on resolves to creates edge from DEPENDENCY to DEPENDENT
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adj = (graph as any).adjacencyList;
+    expect(adj.get('module.app.resource.instance').has('module.app.outputs.ip')).toBe(true);
+  });
 });
