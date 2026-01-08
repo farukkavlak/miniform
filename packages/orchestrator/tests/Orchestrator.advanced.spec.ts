@@ -1,4 +1,4 @@
-/* eslint-disable camelcase */
+
 import { IProvider, ISchema } from '@miniform/contracts';
 import { LocalBackend, StateManager } from '@miniform/state';
 import fs from 'node:fs/promises';
@@ -13,7 +13,6 @@ class MockProvider implements IProvider {
   readonly resources = ['mock_resource'];
   private createdResources: Map<string, Record<string, unknown>> = new Map();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getSchema(_type: string): Promise<ISchema> {
     return {
       message: { type: 'string' },
@@ -24,7 +23,6 @@ class MockProvider implements IProvider {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing
   }
@@ -44,7 +42,6 @@ class MockProvider implements IProvider {
     this.createdResources.delete(id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async read(_type: string, _inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
     return {};
   }

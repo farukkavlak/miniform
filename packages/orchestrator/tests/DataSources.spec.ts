@@ -12,25 +12,20 @@ class MockDataProvider implements IProvider {
   readonly resources = ['mock_resource', 'mock_data', 'unknown_provider'];
   data = new Map<string, Record<string, unknown>>();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getSchema(_type: string): Promise<ISchema> {
     return {};
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async validate(_type: string, _inputs: Record<string, unknown>): Promise<void> {
     // Always valid for testing
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async create(_type: string, _inputs: Record<string, unknown>): Promise<string> {
     return 'created-id';
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async update(_id: string, _type: string, _inputs: Record<string, unknown>): Promise<void> {}
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async delete(_id: string): Promise<void> {}
 
   // Implement read for data sources

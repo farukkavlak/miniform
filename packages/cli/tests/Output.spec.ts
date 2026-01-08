@@ -1,4 +1,4 @@
-/* eslint-disable camelcase */
+
 import { StateManager } from '@miniform/state';
 import * as fs from 'node:fs';
 import path from 'node:path';
@@ -35,8 +35,8 @@ describe('Output Command', () => {
   let readMock: Mock;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
     vi.clearAllMocks();

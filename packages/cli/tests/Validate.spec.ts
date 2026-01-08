@@ -34,7 +34,7 @@ describe('Validate Command', () => {
         validate: validateMock,
         getSchema: getSchemaMock,
       } as unknown as LocalProvider;
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    });
   });
 
   afterEach(() => {
