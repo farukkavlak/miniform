@@ -195,6 +195,59 @@ describe('Output Command', () => {
     }
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error reading outputs'), expect.anything());
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error reading outputs'), expect.anything());
+    expect(processExitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should handle state with undefined variables', async () => {
+    const mockState = {
+      resources: {},
+      variables: undefined,
+    };
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    readMock.mockResolvedValue(mockState);
+
+    const command = createOutputCommand();
+    await command.parseAsync(['node', 'test', '--state', testStatePath]);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('No outputs found'));
+  });
+
+  it('should use default state path if not specified', async () => {
+    const mockState = {
+      resources: {},
+      variables: {
+        '': {
+          default_out: 'default',
+        },
+      },
+    };
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    readMock.mockResolvedValue(mockState);
+
+    const command = createOutputCommand();
+    // No --state argument
+    await command.parseAsync(['node', 'test']);
+
+    // Check if fs.existsSync was called with default path
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith(expect.stringContaining('.miniform/state.json'));
+
+    // Check output
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('default_out'));
+  });
+
+  it('should handle non-Error exceptions', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    readMock.mockRejectedValue('String Error');
+
+    const command = createOutputCommand();
+    try {
+      await command.parseAsync(['node', 'test', '--state', testStatePath]);
+    } catch {
+      // ignore
+    }
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error reading outputs'), 'String Error');
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 });

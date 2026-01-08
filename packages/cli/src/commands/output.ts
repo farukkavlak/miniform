@@ -44,7 +44,7 @@ export function createOutputCommand(): Command {
   command
     .description('Show output values from the current state')
     .option('--json', 'Output in JSON format')
-    .option('--state <path>', 'Path to state file', '.miniform/terraform.tfstate')
+    .option('--state <path>', 'Path to state file')
     .action(async (options) => {
       const statePath = options.state ? path.resolve(process.cwd(), options.state) : path.resolve(process.cwd(), '.miniform/state.json');
 

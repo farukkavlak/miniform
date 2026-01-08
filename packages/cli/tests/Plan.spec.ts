@@ -222,6 +222,31 @@ describe('CLI: plan command', () => {
     expect(fs.writeFile).toHaveBeenCalledWith('plan.json', expect.any(String), 'utf8');
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Plan saved to: plan.json'));
 
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Plan saved to: plan.json'));
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle non-Error exceptions gracefully', async () => {
+    vi.mocked(fs.access).mockResolvedValue(void 0);
+    vi.mocked(fs.readFile).mockResolvedValue('content');
+
+    vi.mocked(Orchestrator).mockImplementation(function () {
+      return {
+        registerProvider: vi.fn(),
+        plan: vi.fn().mockRejectedValue('String Error'),
+      } as Partial<Orchestrator> as Orchestrator;
+    });
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await createPlanCommand().parseAsync(['node', 'miniform', 'plan']);
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Planning failed:'), 'String Error');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    exitSpy.mockRestore();
     consoleSpy.mockRestore();
   });
 });

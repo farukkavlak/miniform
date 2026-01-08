@@ -186,6 +186,34 @@ describe('CLI: apply command', () => {
 
       consoleSpy.mockRestore();
     });
+
+    it('should handle unknown action types gracefully', async () => {
+      vi.mocked(fs.access).mockResolvedValue(void 0);
+      vi.mocked(fs.readFile).mockResolvedValue('content');
+
+      const planMock = vi.fn().mockResolvedValue([{ type: 'UNKNOWN', resourceType: 'test', name: 't' }]);
+      const applyMock = vi.fn().mockResolvedValue({});
+
+      vi.mocked(Orchestrator).mockImplementation(function () {
+        return {
+          registerProvider: vi.fn(),
+          plan: planMock,
+          apply: applyMock,
+        } as Partial<Orchestrator> as Orchestrator;
+      });
+
+      vi.mocked(inquirer.prompt).mockResolvedValue({ confirm: true });
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await createApplyCommand().parseAsync(['node', 'miniform']);
+
+      // Should print action but without specific symbol (default case)
+      expect(consoleSpy).toHaveBeenCalled();
+      // Should invoke apply
+      expect(applyMock).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('Plan file apply', () => {
@@ -335,5 +363,24 @@ describe('CLI: apply command', () => {
       exitSpy.mockRestore();
       consoleSpy.mockRestore();
     });
+  });
+
+  it('should handle non-Error exceptions gracefully', async () => {
+    vi.mocked(fs.access).mockResolvedValue(void 0);
+
+    // Mock fs.readFile to throw a string error
+    vi.mocked(fs.readFile).mockRejectedValue('String Error');
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await createApplyCommand().parseAsync(['node', 'miniform']);
+
+    // Should use String(error)
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Apply failed:'), 'String Error');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    exitSpy.mockRestore();
+    consoleSpy.mockRestore();
   });
 });
