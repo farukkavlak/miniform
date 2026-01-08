@@ -139,7 +139,11 @@ export class Orchestrator {
     await this.actionExecutor.executeActionsSequentially(createUpdateActions, graph, currentState, loadedModules);
 
     const deleteActions = allActions.filter((a) => a.type === 'DELETE');
-    for (const action of deleteActions) await this.executeAction(action, currentState);
+    for (const action of deleteActions) {
+      const provider = this.providers.get(action.resourceType);
+      if (!provider) throw new Error(`No provider registered for resource type "${action.resourceType}"`);
+      await this.actionExecutor.executeDelete(action, provider, currentState);
+    }
 
     this.syncStateVariables(currentState);
 
@@ -187,32 +191,6 @@ export class Orchestrator {
       varsObj[scope] = simpleVarMap;
     }
     currentState.variables = varsObj;
-  }
-
-  private async executeAction(action: PlanAction, currentState: IState): Promise<void> {
-    const provider = this.providers.get(action.resourceType);
-    if (!provider) throw new Error(`No provider registered for resource type "${action.resourceType}"`);
-
-    switch (action.type) {
-      case 'CREATE': {
-        await this.actionExecutor.executeCreate(action, provider, currentState);
-        break;
-      }
-      case 'UPDATE': {
-        await this.actionExecutor.executeUpdate(action, provider, currentState);
-        break;
-      }
-      case 'DELETE': {
-        await this.actionExecutor.executeDelete(action, provider, currentState);
-        break;
-      }
-      case 'NO_OP': {
-        break;
-      }
-      default: {
-        throw new Error(`Unknown action type: ${(action as { type: string }).type}`);
-      }
-    }
   }
 
   private getAttributesMap(attributes: Record<string, AttributeValue> | undefined): Record<string, unknown> {
