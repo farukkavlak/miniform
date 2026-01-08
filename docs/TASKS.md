@@ -250,12 +250,12 @@
 
 ### 9.2. State Management Commands
 
-- [ ] **State Inspection**
-  - [ ] `miniform state list`
-  - [ ] `miniform state show <resource>`
-- [ ] **State Manipulation**
-  - [ ] `miniform state rm <resource>`
-  - [ ] `miniform state mv <old> <new>`
+- [x] **State Inspection**
+  - [x] `miniform state list`
+  - [x] `miniform state show <resource>`
+- [x] **State Manipulation**
+  - [x] `miniform state rm <resource>`
+  - [x] `miniform state mv <old> <new>`
 - [ ] **State Import/Export**
   - [ ] Import existing resources
   - [ ] Export state to JSON
