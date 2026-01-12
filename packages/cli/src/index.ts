@@ -4,8 +4,8 @@ import { createApplyCommand } from './commands/apply';
 import { createInitCommand } from './commands/init';
 import { createOutputCommand } from './commands/output';
 import { createPlanCommand } from './commands/plan';
-import { createValidateCommand } from './commands/validate';
 import { createStateCommand } from './commands/state';
+import { createValidateCommand } from './commands/validate';
 
 const program = new Command();
 
