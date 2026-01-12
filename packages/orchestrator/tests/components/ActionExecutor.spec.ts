@@ -30,12 +30,10 @@ describe('ActionExecutor', () => {
       const resolved: Record<string, unknown> = {};
       for (const [key, val] of Object.entries(attrs)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (val && typeof val === 'object' && 'value' in (val as any)) {
+        if (val && typeof val === 'object' && 'value' in (val as any))
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           resolved[key] = (val as any).value;
-        } else {
-          resolved[key] = val;
-        }
+        else resolved[key] = val;
       }
       return resolved;
     });

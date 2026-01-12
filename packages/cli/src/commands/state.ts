@@ -25,9 +25,7 @@ export function createStateCommand(): Command {
           return;
         }
 
-        for (const key of Object.keys(state.resources).sort()) {
-          console.log(key);
-        }
+        for (const key of Object.keys(state.resources).sort()) console.log(key);
       } catch (error) {
         console.error(chalk.red('Error listing state:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
@@ -52,9 +50,8 @@ export function createStateCommand(): Command {
 
         console.log(chalk.bold(`# ${address}:`));
         console.log(`resource "${resource.type}" "${resource.name}" {`);
-        for (const [key, value] of Object.entries(resource.attributes || {})) {
-          console.log(`  ${key} = ${JSON.stringify(value)}`);
-        }
+        for (const [key, value] of Object.entries(resource.attributes || {})) console.log(`  ${key} = ${JSON.stringify(value)}`);
+
         console.log('}');
       } catch (error) {
         console.error(chalk.red('Error showing resource:'), error instanceof Error ? error.message : String(error));
@@ -76,13 +73,9 @@ export function createStateCommand(): Command {
         try {
           const state = await manager.read();
 
-          if (!state.resources[source]) {
-            throw new Error(`Source resource not found: ${source}`);
-          }
+          if (!state.resources[source]) throw new Error(`Source resource not found: ${source}`);
 
-          if (state.resources[destination]) {
-            throw new Error(`Destination resource already exists: ${destination}`);
-          }
+          if (state.resources[destination]) throw new Error(`Destination resource already exists: ${destination}`);
 
           console.log(chalk.yellow(`Moving ${source} to ${destination}...`));
 
