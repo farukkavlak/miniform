@@ -9,12 +9,14 @@ export interface IResource {
   attributes: Record<string, any>;
 }
 
-export type SchemaType = 'string' | 'number' | 'boolean';
+export type SchemaType = 'string' | 'number' | 'boolean' | 'list' | 'map' | 'object';
 
 export interface ISchemaDefinition {
   type: SchemaType;
   required?: boolean;
   forceNew?: boolean; // If true, a change to this attribute forces replacement (Delete -> Create)
+  elemType?: SchemaType; // For 'list' and 'map'
+  schema?: ISchema; // For 'object'
 }
 
 export type ISchema = Record<string, ISchemaDefinition>;

@@ -148,10 +148,36 @@ export class Parser {
     if (this.matchToken(TokenType.Number)) return { type: 'Number', value: Number(this.previous().value) };
     if (this.matchToken(TokenType.Boolean)) return { type: 'Boolean', value: this.previous().value === 'true' };
 
+    if (this.matchToken(TokenType.LBracket)) return this.parseList();
+    if (this.matchToken(TokenType.LBrace)) return this.parseMap();
+
     // Reference Parsing: identifier.key.subkey
     if (this.checkAny(TokenType.Identifier, TokenType.Data, TokenType.Module)) return this.parseReference();
 
     return this.error(`Unexpected value: ${this.peek().value}`);
+  }
+
+  private parseList(): AttributeValue {
+    const values: AttributeValue[] = [];
+    while (!this.check(TokenType.RBracket) && !this.isAtEnd()) {
+      values.push(this.parseValue());
+      if (!this.matchToken(TokenType.Comma)) break;
+    }
+    this.consume(TokenType.RBracket, "Expect ']' after list.");
+    return { type: 'List', value: values };
+  }
+
+  private parseMap(): AttributeValue {
+    const map: Record<string, AttributeValue> = {};
+    while (!this.check(TokenType.RBrace) && !this.isAtEnd()) {
+      const key = this.matchToken(TokenType.String) ? this.previous().value : this.consume(TokenType.Identifier, 'Expect key in map.').value;
+
+      this.consume(TokenType.Assign, "Expect '=' after key in map.");
+      map[key] = this.parseValue();
+      this.matchToken(TokenType.Comma);
+    }
+    this.consume(TokenType.RBrace, "Expect '}' after map.");
+    return { type: 'Map', value: map };
   }
 
   private parseReference(): AttributeValue {

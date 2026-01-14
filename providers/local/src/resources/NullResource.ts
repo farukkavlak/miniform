@@ -3,7 +3,9 @@ import crypto from 'node:crypto';
 
 export class NullResource implements IResourceHandler {
   async getSchema(): Promise<ISchema> {
-    return {};
+    return {
+      triggers: { type: 'map', elemType: 'string', required: false },
+    };
   }
 
   async validate(_inputs: Record<string, unknown>): Promise<void> {

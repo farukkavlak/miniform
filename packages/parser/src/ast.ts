@@ -1,4 +1,10 @@
-export type AttributeValue = { type: 'String'; value: string } | { type: 'Number'; value: number } | { type: 'Boolean'; value: boolean } | { type: 'Reference'; value: string[] }; // e.g., ["resource_type", "resource_name", "attribute"]
+export type AttributeValue =
+  | { type: 'String'; value: string }
+  | { type: 'Number'; value: number }
+  | { type: 'Boolean'; value: boolean }
+  | { type: 'Reference'; value: string[] } // e.g., ["resource_type", "resource_name", "attribute"]
+  | { type: 'List'; value: AttributeValue[] }
+  | { type: 'Map'; value: Record<string, AttributeValue> };
 
 export interface ResourceBlock {
   type: 'Resource';

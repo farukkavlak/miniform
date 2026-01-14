@@ -36,6 +36,19 @@ export class ReferenceResolver {
 
     if (valueObj.type === 'String' && typeof valueObj.value === 'string') return this.interpolateString(valueObj.value, state, context);
 
+    if (valueObj.type === 'List' && Array.isArray(valueObj.value)) {
+      return valueObj.value.map((item) => this.resolveValue(item, state, context));
+    }
+
+    if (valueObj.type === 'Map' && valueObj.value && typeof valueObj.value === 'object') {
+      const map = valueObj.value as Record<string, unknown>;
+      const resolvedMap: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(map)) {
+        resolvedMap[key] = this.resolveValue(val, state, context);
+      }
+      return resolvedMap;
+    }
+
     if ('type' in valueObj && 'value' in valueObj) return valueObj.value;
 
     return value;

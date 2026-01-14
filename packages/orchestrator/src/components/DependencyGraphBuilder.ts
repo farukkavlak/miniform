@@ -45,9 +45,13 @@ export class DependencyGraphBuilder {
     }
 
     const obj = value as Record<string, unknown>;
-    if (obj.type === 'Reference' && Array.isArray(obj.value)) this.addReferenceDependencies(obj.value as string[], graph, dependentKey, context);
-    else if (obj.type === 'Interpolation' && typeof obj.value === 'string') this.addInterpolationDependencies(obj.value, graph, dependentKey, context);
-    else for (const v of Object.values(obj)) this.addValueDependencies(v, graph, dependentKey, context);
+    if (obj.type === 'Reference' && Array.isArray(obj.value)) {
+      this.addReferenceDependencies(obj.value as string[], graph, dependentKey, context);
+    } else if ((obj.type === 'Interpolation' || obj.type === 'String') && typeof obj.value === 'string') {
+      this.addInterpolationDependencies(obj.value, graph, dependentKey, context);
+    } else {
+      for (const v of Object.values(obj)) this.addValueDependencies(v, graph, dependentKey, context);
+    }
   }
 
   private addReferenceDependencies(refParts: string[], graph: Graph<null>, dependentKey: string, context: Address): void {

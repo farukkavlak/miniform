@@ -25,6 +25,9 @@ export class Lexer {
     { type: TokenType.LBrace, regex: /^{/ },
     { type: TokenType.RBrace, regex: /^}/ },
     { type: TokenType.Dot, regex: /^\./ },
+    { type: TokenType.LBracket, regex: /^\[/ },
+    { type: TokenType.RBracket, regex: /^]/ },
+    { type: TokenType.Comma, regex: /^,/ },
     { type: TokenType.Assign, regex: /^=/ },
   ];
 

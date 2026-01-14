@@ -12,6 +12,9 @@ export enum TokenType {
   RBrace = 'RBRACE', // }
   Assign = 'ASSIGN', // =
   Dot = 'DOT', // . (for references)
+  LBracket = 'LBRACKET', // [
+  RBracket = 'RBRACKET', // ]
+  Comma = 'COMMA', // ,
   EOF = 'EOF', // End of File
 }
 
