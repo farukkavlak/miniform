@@ -68,6 +68,11 @@ output "greeting" {
 - **Number:** `42`, `3.14`
 - **Boolean:** `true`, `false`
 
+### Complex Types
+
+- **List:** `["a", "b", 1, true]`
+- **Map:** `{ key = "value", "quoted_key" = 42 }`
+
 ### References
 
 - **Variable:** `var.region`
@@ -117,8 +122,8 @@ interface OutputBlock {
 }
 
 interface AttributeValue {
-  type: 'String' | 'Number' | 'Boolean' | 'Reference';
-  value: string | number | boolean | string[];
+  type: 'String' | 'Number' | 'Boolean' | 'Reference' | 'List' | 'Map';
+  value: string | number | boolean | string[] | AttributeValue[] | Record<string, AttributeValue>;
 }
 ```
 
@@ -191,15 +196,9 @@ resource "local_file" "derived" {
 
 **Not Yet Supported:**
 
-- Variable blocks (`variable "name" {}`)
-
-- Data sources (`data "type" "name" {}`)
-- Modules (`module "name" {}`)
-- String interpolation (`"${var.x}"`)
-- Lists/Arrays (`["a", "b"]`)
-- Maps/Objects (`{key = "value"}`)
-- Meta-arguments (`count`, `for_each`, `depends_on`)
-- Lifecycle blocks
-- Provisioners
+- **Meta-arguments** (`count`, `for_each`, `depends_on`)
+- **Lifecycle blocks** (`create_before_destroy`, etc.)
+- **Provisioners** (`local-exec`, etc.)
+- **Complex Object Schemas** (Deeply nested object validation)
 
 See [TASKS.md](./TASKS.md) for planned features.

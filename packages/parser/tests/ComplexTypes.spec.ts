@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
+import { ResourceBlock } from '../src/ast';
 import { Lexer } from '../src/Lexer';
 import { Parser } from '../src/Parser';
-import { ResourceBlock } from '../src/ast';
 
 describe('Complex Types Parsing', () => {
   it('should parse a simple list', () => {
@@ -18,7 +19,7 @@ describe('Complex Types Parsing', () => {
     expect(ast[0].type).toBe('Resource');
     const resource = ast[0] as ResourceBlock;
     const items = resource.attributes.items;
-    
+
     expect(items.type).toBe('List');
     if (items.type === 'List') {
       expect(items.value).toEqual([
@@ -42,7 +43,7 @@ describe('Complex Types Parsing', () => {
 
     const resource = ast[0] as ResourceBlock;
     const items = resource.attributes.items;
-    
+
     expect(items.type).toBe('List');
     if (items.type === 'List') {
       expect(items.value).toHaveLength(3);
@@ -67,7 +68,7 @@ describe('Complex Types Parsing', () => {
 
     const resource = ast[0] as ResourceBlock;
     const config = resource.attributes.config;
-    
+
     expect(config.type).toBe('Map');
     if (config.type === 'Map') {
       expect(config.value.debug).toEqual({ type: 'Boolean', value: true });
@@ -97,7 +98,7 @@ describe('Complex Types Parsing', () => {
     const ast = parser.parse();
 
     const resource = ast[0] as ResourceBlock;
-    
+
     // Check nested list
     const matrix = resource.attributes.matrix;
     expect(matrix.type).toBe('List');

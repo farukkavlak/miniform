@@ -117,9 +117,9 @@
 - [x] **Scoped Data Sources**
   - [x] Implement module-level data source scoping
   - [x] Resolve data source references within modules
-- [ ] **Type System Enhancement**
-  - [ ] Support List, Map, and Object types in Schema
-  - [ ] Improve planner diffing for complex types
+- [x] **Type System Enhancement**
+  - [x] Support List, Map, and Object types in Schema
+  - [x] Improve planner diffing for complex types
 - [x] **Variables Support:** Support for usage of `var.name`.
 - [x] **Parallel Graph Execution:** Execute independent nodes in parallel.
 - [x] **String Interpolation:** `${var.x}` support (requires Lexer templates).
