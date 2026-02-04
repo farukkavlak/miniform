@@ -15,16 +15,25 @@ export class ActionExecutor {
 
   async executeActionsSequentially(actions: PlanAction[], graph: Graph<null>, currentState: IState, loadedModules: LoadedModule[]): Promise<void> {
     const layers = graph.topologicalSort();
+    const actionMap = new Map<string, PlanAction>();
+
+    // Pre-compute map for O(1) lookup
+    for (const action of actions) {
+      const key = new Address(action.modulePath || [], action.resourceType, action.name).toString();
+      actionMap.set(key, action);
+    }
 
     for (const layer of layers)
       await Promise.all(
         layer.map(async (key: string) => {
+          // Handle output resolution
           if (key.includes('.outputs.')) {
             this.resolveOutputByKey(key, loadedModules, currentState);
             return;
           }
 
-          const action = actions.find((a) => new Address(a.modulePath || [], a.resourceType, a.name).toString() === key);
+          // Execute resource action if it matches a plan action
+          const action = actionMap.get(key);
           if (action) await this.executeAction(action, currentState);
         })
       );

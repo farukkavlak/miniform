@@ -87,20 +87,39 @@ export class Orchestrator {
   /**
    * Generate an execution plan without applying it
    */
-  async plan(configContent: string, rootDir: string = process.cwd()): Promise<PlanAction[]> {
+  /**
+   * Loads the full execution context (programs, modules, data sources)
+   */
+  private async loadContext(
+    configContent: string,
+    rootDir: string,
+    state: IState
+  ): Promise<{
+    mainProgram: Statement[];
+    loadedResources: import('./components/ModuleLoader').LoadedResource[];
+    loadedModules: LoadedModule[];
+  }> {
     const lexer = new Lexer(configContent);
     const parser = new Parser(lexer.tokenize());
-    const program = parser.parse() || [];
+    const mainProgram = parser.parse() || [];
 
     this.scopeManager.clear();
-    this.processVariables(program, new Address([], '', ''));
+    this.processVariables(mainProgram, new Address([], '', ''));
 
-    const { resources: loadedResources, modules: loadedModules } = await this.moduleLoader.loadModuleTree(rootDir, program);
-
-    const currentState = await this.stateManager.read();
+    const { resources: loadedResources, modules: loadedModules } = await this.moduleLoader.loadModuleTree(rootDir, mainProgram);
 
     this.dataSources.clear();
-    for (const mod of loadedModules) await this.processDataSources(mod.program, currentState, mod.address);
+    for (const mod of loadedModules) await this.processDataSources(mod.program, state, mod.address);
+
+    return { mainProgram, loadedResources, loadedModules };
+  }
+
+  /**
+   * Generate an execution plan without applying it
+   */
+  async plan(configContent: string, rootDir: string = process.cwd()): Promise<PlanAction[]> {
+    const currentState = await this.stateManager.read();
+    const { loadedResources } = await this.loadContext(configContent, rootDir, currentState);
 
     const virtualProgram: Statement[] = loadedResources.map((r) => ({
       ...r.block,
@@ -118,23 +137,20 @@ export class Orchestrator {
   }
 
   async apply(configContent: string, rootDir: string = process.cwd()): Promise<Record<string, unknown>> {
+    // 1. Initial Plan (Dry Run to get actions)
+    // Note: We might be engaging in double work here (re-parsing), but plan() is stateless.
+    // Optimization: plan could return context, but for now we keep API simple.
     const allActions = await this.plan(configContent, rootDir);
+
     const currentState = await this.stateManager.read();
 
-    this.scopeManager.clear();
-    const lexer = new Lexer(configContent);
-    const parser = new Parser(lexer.tokenize());
-    const mainProgram = parser.parse() || [];
+    // 2. Load execution context (Modules, DataSources, etc.)
+    const { mainProgram, loadedModules, loadedResources } = await this.loadContext(configContent, rootDir, currentState);
 
-    this.processVariables(mainProgram, new Address([], '', ''));
-
-    const { resources: loadedResources, modules: loadedModules } = await this.moduleLoader.loadModuleTree(rootDir, mainProgram);
-
-    this.dataSources.clear();
-    for (const mod of loadedModules) await this.processDataSources(mod.program, currentState, mod.address);
-
+    // 3. Build Dependency Graph
     const graph = this.dependencyGraphBuilder.buildExecutionGraph(loadedResources, loadedModules);
 
+    // 4. Execution
     const createUpdateActions = allActions.filter((a) => a.type !== 'DELETE');
     await this.actionExecutor.executeActionsSequentially(createUpdateActions, graph, currentState, loadedModules);
 
@@ -145,8 +161,8 @@ export class Orchestrator {
       await this.actionExecutor.executeDelete(action, provider, currentState);
     }
 
+    // 5. Sync & Persist
     this.syncStateVariables(currentState);
-
     await this.stateManager.write(currentState);
 
     return this.processOutputs(mainProgram, currentState, Address.root('', ''));
