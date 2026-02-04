@@ -14,13 +14,22 @@ export class DependencyGraphBuilder {
     // Add all resources as nodes
     for (const { uniqueId } of loadedResources) graph.addNode(uniqueId, null);
 
-    // Add output nodes and their dependencies
+    // Add output nodes first (without dependencies)
     for (const mod of loadedModules) {
       const scope = this.scopeManager.getScope(mod.address);
       for (const stmt of mod.program)
         if (stmt.type === 'Output') {
           const outputKey = scope ? `${scope}.outputs.${stmt.name}` : `outputs.${stmt.name}`;
           graph.addNode(outputKey, null);
+        }
+    }
+
+    // Then add output dependencies
+    for (const mod of loadedModules) {
+      const scope = this.scopeManager.getScope(mod.address);
+      for (const stmt of mod.program)
+        if (stmt.type === 'Output') {
+          const outputKey = scope ? `${scope}.outputs.${stmt.name}` : `outputs.${stmt.name}`;
           this.addValueDependencies(stmt.value, graph, outputKey, mod.address);
         }
     }

@@ -255,7 +255,9 @@ describe('LocalProvider', () => {
     it('should return schema for null_resource', async () => {
       const schema = await provider.getSchema('null_resource');
       expect(schema).toBeDefined();
-      expect(Object.keys(schema)).toHaveLength(0);
+      expect(Object.keys(schema)).toHaveLength(1);
+      expect(schema.triggers).toBeDefined();
+      expect(schema.triggers.type).toBe('map');
     });
 
     it('should throw for unknown types', async () => {
