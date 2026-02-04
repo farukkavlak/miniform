@@ -21,13 +21,12 @@ describe('Complex Types Parsing', () => {
     const items = resource.attributes.items;
 
     expect(items.type).toBe('List');
-    if (items.type === 'List') {
+    if (items.type === 'List')
       expect(items.value).toEqual([
         { type: 'String', value: 'a' },
         { type: 'String', value: 'b' },
         { type: 'String', value: 'c' },
       ]);
-    }
   });
 
   it('should parse a list with mixed types', () => {
@@ -105,9 +104,7 @@ describe('Complex Types Parsing', () => {
     if (matrix.type === 'List') {
       const firstRow = matrix.value[0];
       expect(firstRow.type).toBe('List');
-      if (firstRow.type === 'List') {
-        expect(firstRow.value[0]).toEqual({ type: 'Number', value: 1 });
-      }
+      if (firstRow.type === 'List') expect(firstRow.value[0]).toEqual({ type: 'Number', value: 1 });
     }
 
     // Check nested map
@@ -116,9 +113,7 @@ describe('Complex Types Parsing', () => {
     if (meta.type === 'Map') {
       expect(meta.value.tags.type).toBe('List');
       expect(meta.value.owner.type).toBe('Map');
-      if (meta.value.owner.type === 'Map') {
-        expect(meta.value.owner.value.name).toEqual({ type: 'String', value: 'admin' });
-      }
+      if (meta.value.owner.type === 'Map') expect(meta.value.owner.value.name).toEqual({ type: 'String', value: 'admin' });
     }
   });
 });

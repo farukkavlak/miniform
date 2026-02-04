@@ -14,7 +14,16 @@ export class DependencyGraphBuilder {
     // Add all resources as nodes
     for (const { uniqueId } of loadedResources) graph.addNode(uniqueId, null);
 
-    // Add output nodes first (without dependencies)
+    this.addOutputNodes(loadedModules, graph);
+    this.addOutputDependencies(loadedModules, graph);
+
+    // Add resource dependencies
+    for (const { address, block } of loadedResources) this.addResourceDependencies(block, graph, address);
+
+    return graph;
+  }
+
+  private addOutputNodes(loadedModules: LoadedModule[], graph: Graph<null>): void {
     for (const mod of loadedModules) {
       const scope = this.scopeManager.getScope(mod.address);
       for (const stmt of mod.program)
@@ -23,8 +32,9 @@ export class DependencyGraphBuilder {
           graph.addNode(outputKey, null);
         }
     }
+  }
 
-    // Then add output dependencies
+  private addOutputDependencies(loadedModules: LoadedModule[], graph: Graph<null>): void {
     for (const mod of loadedModules) {
       const scope = this.scopeManager.getScope(mod.address);
       for (const stmt of mod.program)
@@ -33,11 +43,6 @@ export class DependencyGraphBuilder {
           this.addValueDependencies(stmt.value, graph, outputKey, mod.address);
         }
     }
-
-    // Add resource dependencies
-    for (const { address, block } of loadedResources) this.addResourceDependencies(block, graph, address);
-
-    return graph;
   }
 
   private addResourceDependencies(stmt: ResourceBlock, graph: Graph<null>, parsedAddress: Address): void {
@@ -53,14 +58,13 @@ export class DependencyGraphBuilder {
       return;
     }
 
-    const obj = value as Record<string, unknown>;
-    if (obj.type === 'Reference' && Array.isArray(obj.value)) {
-      this.addReferenceDependencies(obj.value as string[], graph, dependentKey, context);
-    } else if ((obj.type === 'Interpolation' || obj.type === 'String') && typeof obj.value === 'string') {
-      this.addInterpolationDependencies(obj.value, graph, dependentKey, context);
-    } else {
-      for (const v of Object.values(obj)) this.addValueDependencies(v, graph, dependentKey, context);
-    }
+    this.processObjectDependencies(value as Record<string, unknown>, graph, dependentKey, context);
+  }
+
+  private processObjectDependencies(obj: Record<string, unknown>, graph: Graph<null>, dependentKey: string, context: Address): void {
+    if (obj.type === 'Reference' && Array.isArray(obj.value)) this.addReferenceDependencies(obj.value as string[], graph, dependentKey, context);
+    else if ((obj.type === 'Interpolation' || obj.type === 'String') && typeof obj.value === 'string') this.addInterpolationDependencies(obj.value, graph, dependentKey, context);
+    else for (const v of Object.values(obj)) this.addValueDependencies(v, graph, dependentKey, context);
   }
 
   private addReferenceDependencies(refParts: string[], graph: Graph<null>, dependentKey: string, context: Address): void {

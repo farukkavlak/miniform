@@ -36,22 +36,27 @@ export class ReferenceResolver {
 
     if (valueObj.type === 'String' && typeof valueObj.value === 'string') return this.interpolateString(valueObj.value, state, context);
 
-    if (valueObj.type === 'List' && Array.isArray(valueObj.value)) {
-      return valueObj.value.map((item) => this.resolveValue(item, state, context));
-    }
+    if (valueObj.type === 'List') return this.resolveList(valueObj, state, context);
 
-    if (valueObj.type === 'Map' && valueObj.value && typeof valueObj.value === 'object') {
-      const map = valueObj.value as Record<string, unknown>;
-      const resolvedMap: Record<string, unknown> = {};
-      for (const [key, val] of Object.entries(map)) {
-        resolvedMap[key] = this.resolveValue(val, state, context);
-      }
-      return resolvedMap;
-    }
+    if (valueObj.type === 'Map') return this.resolveMap(valueObj, state, context);
 
     if ('type' in valueObj && 'value' in valueObj) return valueObj.value;
 
     return value;
+  }
+
+  private resolveList(valueObj: { value?: unknown }, state: IState, context?: Address): unknown[] {
+    if (!Array.isArray(valueObj.value)) return [];
+    return valueObj.value.map((item) => this.resolveValue(item, state, context));
+  }
+
+  private resolveMap(valueObj: { value?: unknown }, state: IState, context?: Address): Record<string, unknown> {
+    if (!valueObj.value || typeof valueObj.value !== 'object') return {};
+    const map = valueObj.value as Record<string, unknown>;
+    const resolvedMap: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(map)) resolvedMap[key] = this.resolveValue(val, state, context);
+
+    return resolvedMap;
   }
 
   interpolateString(value: string, state: IState, context?: Address): string {
